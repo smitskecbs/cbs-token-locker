@@ -1,0 +1,26 @@
+{
+  "name": "cbs-token-locker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "tsx api/server.ts",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12"
+  },
+  "dependencies": {
+    "@solana-program/system": "^0.12.0",
+    "@solana-program/token": "^0.13.0",
+    "@solana/kit": "^6.9.0",
+    "@wallet-standard/app": "^1.1.0",
+    "buffer": "^6.0.3",
+    "dotenv": "^17.4.2"
+  }
+}

@@ -1,0 +1,29 @@
+[package]
+name = "cbs-token-locker"
+version = "0.1.0"
+description = "CBS Token Locker on-chain program for SPL and LP token locks"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/cbs-coin/cbs-token-locker"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "cbs_token_locker"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+default = []
+
+[dependencies]
+anchor-lang = "0.31.1"
+anchor-spl = { version = "0.31.1", features = ["token"] }
+# Force BPF-compatible transitive crates (see root Cargo.toml / DEVNET_TESTING.md).
+blake3 = { workspace = true }
+constant_time_eq = { workspace = true }
+proc-macro-crate = { workspace = true }
+indexmap = { workspace = true }
+unicode-segmentation = { workspace = true }
