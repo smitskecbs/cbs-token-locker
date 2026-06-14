@@ -45,6 +45,7 @@ import { getProgramStatus, refreshProgramStatus, subscribeToProgramStatus } from
 import type { CreateLockInput, LockRecord, LockSearchField, PreviewLock, TokenType } from '../types/lock'
 import { readCreateLockFormState } from '../utils/formValidation'
 import { formatUserFacingLockError } from '../utils/lockUiErrors'
+import { registerHomeTabActivator } from '../utils/lockDetailNavigation'
 import { getSearchTooShortMessage, shouldRunLockSearch } from '../utils/searchQuery'
 import { showSuccessToast } from '../utils/toast'
 import { executeCreateLockWithProgress } from '../utils/createLock'
@@ -199,6 +200,7 @@ async function handleMyLockUnlock(lockAccount: string, button: HTMLButtonElement
     }
 
     showSuccessToast('Tokens unlocked successfully. Tokens have been returned to your wallet.')
+    await refreshMyLocksSection({ force: true, source: 'my-locks:unlock-success' })
   } catch (error) {
     console.error('[CBS Locker] my locks unlock failure', error)
     button.disabled = false
@@ -219,6 +221,8 @@ function handleLockUnlockedFromDetail(updatedLock: LockRecord): void {
     historyLocksCache = sortLocksNewestFirst(filterHistoryWalletLocks(myLocksCache))
     refreshHistoryDisplay()
   }
+
+  void refreshMyLocksSection({ force: true, source: 'my-locks:unlock-success' })
 }
 
 function refreshPublicLocksDisplay(): void {
@@ -348,7 +352,7 @@ let tabHandlersAttached = false
 
 function handleTabActivated(tab: AppTabId): void {
   if (tab === 'locks') {
-    void refreshMyLocksSection({ force: false, source: 'my-locks:tab-open' })
+    refreshMyLocksDisplay()
   }
 
   if (tab === 'history') {
@@ -411,7 +415,7 @@ function attachTabHandlers(): void {
 
   if (window.location.hash === '#my-locks') {
     setActiveAppTab('locks')
-    void refreshMyLocksSection({ force: false, source: 'my-locks:tab-open' })
+    refreshMyLocksDisplay()
   }
 }
 
@@ -456,6 +460,7 @@ function renderMyLocksResults(
   loading: boolean,
   connectedWallet: string | null,
   errorMessage: string | null = null,
+  errorDetails: string | null = null,
 ): void {
   host.innerHTML = renderMyLocksContent(
     locks,
@@ -463,6 +468,7 @@ function renderMyLocksResults(
     loading,
     connectedWallet,
     errorMessage,
+    errorDetails,
   )
 }
 
@@ -548,11 +554,11 @@ async function refreshMyLocksSection(options?: {
     walletLocksCacheKey = null
     myLocksCache = []
 
-    const { message } = formatUserFacingLockError(error, getSelectedClusterLabel())
+    const { message, details } = formatUserFacingLockError(error, getSelectedClusterLabel())
     const resultsAfterError = getMyLocksResultsHost()
 
     if (resultsAfterError) {
-      renderMyLocksResults(resultsAfterError, [], true, false, walletState.address, message)
+      renderMyLocksResults(resultsAfterError, [], true, false, walletState.address, message, details)
     }
   }
 }
@@ -707,7 +713,7 @@ function schedulePublicSearch(): void {
   searchDebounceTimer = setTimeout(() => {
     searchDebounceTimer = null
     void refreshPublicSearchSection()
-  }, 500)
+  }, 750)
 }
 
 let clusterHandlersAttached = false
@@ -723,8 +729,15 @@ function handleNetworkSwitch(network: SolanaNetwork): void {
 
   void refreshProgramStatus(network).then(() => {
     refreshNetworkUi()
-    refreshMyLocksDisplay()
     refreshHistoryDisplay()
+
+    const walletState = getWalletConnectionState()
+
+    if (walletState.status === 'connected' && walletState.address) {
+      void refreshMyLocksSection({ force: true, source: 'my-locks:network-change' })
+    } else {
+      refreshMyLocksDisplay()
+    }
 
     const searchInput = document.querySelector<HTMLInputElement>('#publicLockSearchInput')
     const searchField = document.querySelector<HTMLSelectElement>('#publicLockSearchField')
@@ -769,7 +782,7 @@ function attachClusterHandlers(): void {
       return
     }
 
-    void refreshProgramStatus(getSelectedNetwork()).then(() => {
+    void refreshProgramStatus(getSelectedNetwork(), { force: true }).then(() => {
       refreshNetworkUi()
     })
   })
@@ -1142,6 +1155,11 @@ function attachPublicSearchHandlers(): void {
 }
 
 export function attachAppHandlers(): void {
+  registerHomeTabActivator((tab) => {
+    setActiveAppTab(tab)
+    handleTabActivated(tab)
+  })
+
   attachSiteFooterHandlers()
   attachClusterHandlers()
   attachWalletHandlers()
@@ -1163,11 +1181,18 @@ export function attachAppHandlers(): void {
     if (nextAddress !== lastKnownWalletAddress) {
       clearWalletLockCaches()
       lastKnownWalletAddress = nextAddress
+
+      if (nextWalletState.status === 'connected' && nextAddress) {
+        void refreshMyLocksSection({ force: true, source: 'my-locks:wallet-change' })
+      } else {
+        refreshMyLocksDisplay()
+      }
+    } else {
+      refreshMyLocksDisplay()
     }
 
     refreshCreateLockAvailability()
     refreshDebugPanel()
-    refreshMyLocksDisplay()
 
     if (historyLoaded) {
       refreshHistoryDisplay()

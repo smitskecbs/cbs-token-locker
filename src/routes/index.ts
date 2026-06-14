@@ -1,4 +1,5 @@
 import type { LockSearchField } from '../types/lock'
+import { captureLockDetailReturnTarget } from '../utils/lockDetailNavigation'
 
 export type AppRoute =
   | { name: 'home' }
@@ -100,6 +101,10 @@ export function initRouter(onRouteChange: RouteListener): void {
 
     if (!link.hasAttribute('data-router-link')) {
       return
+    }
+
+    if (link.pathname.match(/^\/lock\/[^/]+\/?$/)) {
+      captureLockDetailReturnTarget()
     }
 
     event.preventDefault()

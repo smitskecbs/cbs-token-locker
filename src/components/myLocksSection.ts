@@ -1,5 +1,5 @@
 import type { LockRecord } from '../types/lock'
-import { escapeHtml } from '../utils/html'
+import { renderUserFacingErrorHtml } from '../utils/lockUiErrors'
 import { renderLockTable } from './lockTable'
 
 export function renderMyLocksContent(
@@ -8,6 +8,7 @@ export function renderMyLocksContent(
   loading = false,
   connectedWallet: string | null = null,
   errorMessage: string | null = null,
+  errorDetails: string | null = null,
 ): string {
   if (loading) {
     return `<p class="empty-state my-locks-state">Loading your locks...</p>`
@@ -22,11 +23,7 @@ export function renderMyLocksContent(
   }
 
   if (errorMessage) {
-    return `
-      <div class="empty-state-panel my-locks-state">
-        <p class="empty-state__body">${escapeHtml(errorMessage)}</p>
-      </div>
-    `
+    return renderUserFacingErrorHtml(errorMessage, errorDetails)
   }
 
   return renderLockTable(

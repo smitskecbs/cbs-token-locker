@@ -409,6 +409,41 @@ body {
   word-break: break-all;
 }
 
+.lock-certificate {
+  position: relative;
+}
+
+.lock-certificate__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 0 8px;
+}
+
+.lock-certificate__close {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.lock-certificate__close:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.inline-notice {
+  margin: 0;
+  font-size: 14px;
+  color: #92400e;
+}
+
 .certificate-header {
   text-align: center;
   margin-bottom: 20px;

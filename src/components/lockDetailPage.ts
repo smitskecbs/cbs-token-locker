@@ -5,7 +5,6 @@ import { getOrbAccountUrl } from '../solana/config'
 import { fetchOnChainLock } from '../solana/client'
 import { fetchMintDecimalsForLock } from '../solana/mintDecimals'
 import { inspectUnlockedLock } from '../solana/unlockVerification'
-import { LIVE_REFRESH_INTERVAL_MS } from '../state/rpcActivityStore'
 import type { LockRecord } from '../types/lock'
 import { formatDateTime, formatTokenType, formatWalletAddress } from '../utils/format'
 import { escapeHtml } from '../utils/html'
@@ -16,6 +15,12 @@ import {
   isUnlockTimeReached,
   renderLockStatusMarkup,
 } from '../utils/lockDisplay'
+import {
+  closeLockDetailView,
+  peekLockDetailReturnTarget,
+  getLockDetailBackLabel,
+  type LockDetailReturnTarget,
+} from '../utils/lockDetailNavigation'
 import { executeUnlockLock } from '../utils/unlockLock'
 import { showSuccessToast } from '../utils/toast'
 import {
@@ -31,17 +36,12 @@ export type LockDetailContext = {
   connectedWallet: string | null
 }
 
-let lockDetailRefreshTimer: ReturnType<typeof setInterval> | null = null
 let lockDetailWalletUnsubscribe: (() => void) | null = null
 let activeLockDetailAccount: string | null = null
 let activeLockDetailRecord: LockRecord | null = null
+let activeLockDetailReturn: LockDetailReturnTarget = { kind: 'create' }
 
 export function stopLockDetailLiveRefresh(): void {
-  if (lockDetailRefreshTimer !== null) {
-    clearInterval(lockDetailRefreshTimer)
-    lockDetailRefreshTimer = null
-  }
-
   if (lockDetailWalletUnsubscribe) {
     lockDetailWalletUnsubscribe()
     lockDetailWalletUnsubscribe = null
@@ -105,11 +105,13 @@ function renderLockDetails(
   lock: LockRecord,
   mintDecimals: number | null,
   connectedWallet: string | null,
+  returnTarget: LockDetailReturnTarget,
   now = Date.now(),
 ): string {
   const status = getDisplayLockStatus(lock, now)
   const amount = formatLockAmountDisplay(lock, mintDecimals)
   const orbUrl = getOrbAccountUrl(lock.lockAccount, getSelectedNetwork())
+  const backLabel = getLockDetailBackLabel(returnTarget)
 
   const verificationLabel = lock.onChainVerified
     ? '<p class="certificate-badge">Verified On-Chain</p>'
@@ -118,6 +120,16 @@ function renderLockDetails(
   return `
     <main class="app-shell app-shell--simple">
       <section class="main-card lock-certificate" aria-labelledby="lock-detail-heading">
+        <div class="lock-certificate__toolbar">
+          <button
+            type="button"
+            class="lock-certificate__close"
+            id="closeLockDetailBtn"
+            aria-label="Close lock certificate"
+          >
+            ×
+          </button>
+        </div>
         <header class="certificate-header">
           <p class="certificate-eyebrow">CBS Token Locker</p>
           <h1 class="certificate-title" id="lock-detail-heading">${escapeHtml(lock.projectName)}</h1>
@@ -155,8 +167,8 @@ function renderLockDetails(
           >
             View on Orb
           </a>
-          <a class="secondary-btn" href="/" data-router-link data-app-tab-link="locks">
-            Back
+          <a class="secondary-btn" href="/" data-lock-detail-back>
+            ${escapeHtml(backLabel)}
           </a>
         </div>
 
@@ -212,16 +224,30 @@ export function renderLockDetailLoading(lockAccount: string): string {
 }
 
 export function renderLockDetailPage(context: LockDetailContext, lockAccount: string): string {
+  activeLockDetailReturn = peekLockDetailReturnTarget()
+
   if (!context.lock) {
+    const backLabel = getLockDetailBackLabel(activeLockDetailReturn)
+
     return `
       <main class="app-shell app-shell--simple">
-        <section class="main-card" aria-labelledby="lock-not-found-heading">
+        <section class="main-card lock-certificate" aria-labelledby="lock-not-found-heading">
+          <div class="lock-certificate__toolbar">
+            <button
+              type="button"
+              class="lock-certificate__close"
+              id="closeLockDetailBtn"
+              aria-label="Close lock certificate"
+            >
+              ×
+            </button>
+          </div>
           <h1 class="certificate-title" id="lock-not-found-heading">Lock not found</h1>
           <p class="empty-state__body">
             No lock at <span class="mono">${escapeHtml(formatWalletAddress(lockAccount, 6))}</span>.
           </p>
           <div class="lock-detail-actions">
-            <a class="primary-btn" href="/" data-router-link>Home</a>
+            <button type="button" class="primary-btn" data-lock-detail-back>${escapeHtml(backLabel)}</button>
           </div>
         </section>
         ${renderSiteFooter()}
@@ -233,6 +259,7 @@ export function renderLockDetailPage(context: LockDetailContext, lockAccount: st
     context.lock,
     context.mintDecimals,
     context.connectedWallet,
+    activeLockDetailReturn,
   )
 }
 
@@ -331,12 +358,12 @@ function attachUnlockHandler(lock: LockRecord, _lockAccount: string): void {
   }
 }
 
-function startLockDetailLiveRefresh(lock: LockRecord, lockAccount: string): void {
+function startLockDetailWalletSync(lock: LockRecord, lockAccount: string): void {
   stopLockDetailLiveRefresh()
   activeLockDetailAccount = lockAccount
   activeLockDetailRecord = lock
 
-  const refresh = () => {
+  lockDetailWalletUnsubscribe = subscribeToWalletConnection(() => {
     if (!activeLockDetailRecord) {
       return
     }
@@ -345,12 +372,23 @@ function startLockDetailLiveRefresh(lock: LockRecord, lockAccount: string): void
       activeLockDetailRecord,
       getWalletConnectionState().address,
     )
+  })
+}
+
+function attachLockDetailCloseHandlers(): void {
+  const closeButton = document.querySelector<HTMLButtonElement>('#closeLockDetailBtn')
+  const backButtons = document.querySelectorAll<HTMLElement>('[data-lock-detail-back]')
+
+  const handleClose = (event: Event) => {
+    event.preventDefault()
+    closeLockDetailView()
   }
 
-  lockDetailRefreshTimer = setInterval(refresh, LIVE_REFRESH_INTERVAL_MS)
-  lockDetailWalletUnsubscribe = subscribeToWalletConnection(() => {
-    refresh()
-  })
+  closeButton?.addEventListener('click', handleClose)
+
+  for (const button of backButtons) {
+    button.addEventListener('click', handleClose)
+  }
 }
 
 export function attachLockDetailHandlers(
@@ -358,6 +396,8 @@ export function attachLockDetailHandlers(
   lockAccount: string,
 ): void {
   attachSiteFooterHandlers()
+  attachLockDetailCloseHandlers()
+
   const lock = context.lock
   const copyButton = document.querySelector<HTMLButtonElement>('#copyLockLinkBtn')
 
@@ -385,5 +425,5 @@ export function attachLockDetailHandlers(
   }
 
   attachUnlockHandler(lock, lockAccount)
-  startLockDetailLiveRefresh(lock, lockAccount)
+  startLockDetailWalletSync(lock, lockAccount)
 }

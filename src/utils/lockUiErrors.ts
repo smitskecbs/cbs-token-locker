@@ -3,8 +3,7 @@ import { formatLockerError } from '../solana/errors'
 import { isRpcRateLimitError } from '../solana/rpcFetch'
 import { escapeHtml } from './html'
 
-export const RPC_BUSY_USER_MESSAGE =
-  'Solana RPC is busy. Please wait a moment and try again.'
+export const RPC_BUSY_USER_MESSAGE = 'Network is busy. Try again in a moment.'
 
 export function isRpcBusyError(error: unknown): boolean {
   if (error instanceof LockApiError) {
@@ -44,14 +43,14 @@ export function renderUserFacingErrorHtml(message: string, details: string | nul
   if (!details) {
     return `
       <div class="empty-state-panel">
-        <p class="empty-state__body">${escapeHtml(message)}</p>
+        <p class="inline-notice">${escapeHtml(message)}</p>
       </div>
     `
   }
 
   return `
     <div class="empty-state-panel">
-      <p class="empty-state__body">${escapeHtml(message)}</p>
+      <p class="inline-notice">${escapeHtml(message)}</p>
       <details class="technical-details technical-details--error">
         <summary class="technical-details__summary technical-details__summary--compact">Show details</summary>
         <pre class="mono simulation-debug__pre">${escapeHtml(details)}</pre>

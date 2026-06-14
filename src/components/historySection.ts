@@ -55,7 +55,7 @@ export function renderHistoryPanel(
 
     return `
       <div class="empty-state-panel my-locks-state">
-        <p class="empty-state__body">${escapeHtml(state.message)}</p>
+        <p class="inline-notice">${escapeHtml(state.message)}</p>
         ${detailsBlock}
         <button type="button" class="secondary-btn" id="loadHistoryBtn" data-load-history>
           Try Again
