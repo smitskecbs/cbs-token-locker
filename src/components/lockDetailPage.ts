@@ -23,7 +23,7 @@ import {
   subscribeToWalletConnection,
 } from '../wallet'
 
-import { renderSiteFooter } from './siteFooter'
+import { renderSiteFooter, attachSiteFooterHandlers } from './siteFooter'
 
 export type LockDetailContext = {
   lock: LockRecord | null
@@ -141,10 +141,6 @@ function renderLockDetails(
             <dt>Owner</dt>
             <dd class="mono">${escapeHtml(formatWalletAddress(lock.owner, 6))}</dd>
           </div>
-          <div class="certificate-fact">
-            <dt>Vault</dt>
-            <dd class="mono">${escapeHtml(formatWalletAddress(lock.vault, 6))}</dd>
-          </div>
         </dl>
 
         ${renderUnlockSection(lock, connectedWallet, now)}
@@ -169,8 +165,16 @@ function renderLockDetails(
           <div class="advanced-details__content">
             <dl class="detail-list">
               <div class="detail-item">
+                <dt>Raw amount</dt>
+                <dd class="mono">${escapeHtml(amount.raw)}</dd>
+              </div>
+              <div class="detail-item">
                 <dt>Lock account</dt>
                 <dd class="mono">${escapeHtml(lock.lockAccount)}</dd>
+              </div>
+              <div class="detail-item">
+                <dt>Vault account</dt>
+                <dd class="mono">${escapeHtml(lock.vault)}</dd>
               </div>
               <div class="detail-item">
                 <dt>Token mint</dt>
@@ -353,6 +357,7 @@ export function attachLockDetailHandlers(
   context: LockDetailContext,
   lockAccount: string,
 ): void {
+  attachSiteFooterHandlers()
   const lock = context.lock
   const copyButton = document.querySelector<HTMLButtonElement>('#copyLockLinkBtn')
 

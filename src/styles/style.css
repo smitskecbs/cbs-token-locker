@@ -30,8 +30,8 @@ body {
 }
 
 .app-shell--simple {
-  gap: 16px;
-  padding: 20px 16px 32px;
+  gap: 12px;
+  padding: 16px 16px 24px;
   width: 100%;
   max-width: 700px;
   margin: 0 auto;
@@ -79,13 +79,13 @@ body {
   border-radius: 20px;
   background: #ffffff;
   box-shadow: 0 8px 32px rgba(216, 111, 0, 0.08);
-  padding: 16px;
+  padding: 14px 18px 16px;
   overflow: hidden;
 }
 
 .main-card__banner-wrap {
-  width: calc(100% + 32px);
-  margin: -16px -16px 14px;
+  width: calc(100% + 36px);
+  margin: -14px -18px 12px;
   border-radius: 20px 20px 0 0;
   overflow: hidden;
 }
@@ -94,17 +94,24 @@ body {
   display: block;
   width: 100%;
   height: auto;
-  min-height: 100px;
-  max-height: 200px;
+  min-height: 88px;
+  max-height: 168px;
   object-fit: cover;
   border-radius: 0;
 }
 
+@media (min-width: 641px) {
+  .main-card__banner {
+    min-height: 76px;
+    max-height: 145px;
+  }
+}
+
 .wallet-bar {
-  padding-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(216, 111, 0, 0.1);
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wallet-bar__controls {
@@ -115,14 +122,15 @@ body {
 @media (min-width: 641px) {
   .wallet-bar__controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    align-items: end;
+    gap: 14px;
+    align-items: start;
   }
 }
 
 .wallet-bar__section {
   display: grid;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .wallet-bar__section-label {
@@ -139,6 +147,39 @@ body {
   font-size: 12px;
   font-weight: 700;
   color: #888888;
+}
+
+.wallet-bar__connected {
+  display: grid;
+  gap: 8px;
+}
+
+.wallet-bar__connected-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #15803d;
+  line-height: 1.4;
+}
+
+.wallet-bar__connected-dot {
+  flex-shrink: 0;
+}
+
+.wallet-bar__connected .wallet-bar__address {
+  margin: 0;
+  font-weight: 600;
+  color: #333333;
+}
+
+.wallet-bar__disconnect {
+  width: 100%;
+  padding: 8px 14px;
+  font-size: 13px;
 }
 
 .wallet-bar__row {
@@ -168,7 +209,8 @@ body {
   color: #555555;
 }
 
-.wallet-bar__select {
+.wallet-bar__select,
+.wallet-bar__controls .field-select {
   width: 100%;
   border: 1px solid rgba(216, 111, 0, 0.2);
   border-radius: 10px;
@@ -181,12 +223,7 @@ body {
 .wallet-bar__connect {
   width: 100%;
   min-height: 48px;
-}
-
-.wallet-bar__disconnect {
-  width: 100%;
-  padding: 10px 14px;
-  font-size: 13px;
+  margin-top: 2px;
 }
 
 .wallet-bar__btn {
@@ -210,7 +247,7 @@ body {
 }
 
 .wallet-bar__network-select {
-  min-height: 44px;
+  min-height: 48px;
 }
 
 .wallet-bar__program-status {
@@ -233,19 +270,23 @@ body {
 
 .app-tabs {
   display: flex;
-  gap: 4px;
-  margin-top: 12px;
+  gap: 2px;
+  margin-top: 10px;
+  border-bottom: 1px solid rgba(216, 111, 0, 0.12);
 }
 
 .app-tab {
   flex: 1;
   border: 0;
   background: transparent;
-  padding: 12px 6px;
+  padding: 14px 8px;
+  min-height: 48px;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.2;
   color: #888888;
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
   cursor: pointer;
   transition: color 120ms ease, border-color 120ms ease;
 }
@@ -256,11 +297,11 @@ body {
 }
 
 .app-tab-panels {
-  padding-top: 14px;
+  padding-top: 12px;
 }
 
 .app-tab-panel {
-  min-height: 80px;
+  min-height: 0;
 }
 
 .my-locks-results {
@@ -723,6 +764,17 @@ body {
   color: #888888;
 }
 
+.field-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #999999;
+}
+
+.field-hint--row {
+  margin-top: -4px;
+}
+
 .field-input {
   width: 100%;
   min-height: 48px;
@@ -781,7 +833,7 @@ body {
 
 .lock-form {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .lock-form .primary-btn {
@@ -1598,6 +1650,13 @@ body {
   line-height: 1.5;
 }
 
+.empty-state__hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #999999;
+}
+
 .technical-details-section {
   width: 100%;
   max-width: 720px;
@@ -1783,12 +1842,22 @@ body {
   max-width: 720px;
   text-align: center;
   padding: 8px 0 0;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
 }
 
 .site-footer__text {
   margin: 0;
   color: #666666;
   font-size: 14px;
+}
+
+.site-footer__donate {
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .site-footer__link {
@@ -1802,15 +1871,25 @@ body {
 }
 
 @media (max-width: 900px) and (min-width: 641px) {
-  .app-shell--simple,
   .advanced-details-section {
-    max-width: 620px;
+    max-width: 700px;
   }
 }
 
 @media (max-width: 640px) {
   .app-shell {
-    padding: 16px 14px 28px;
+    padding: 14px 12px 20px;
+  }
+
+  .app-shell--simple {
+    gap: 10px;
+    padding: 12px 12px 20px;
+  }
+
+  .app-tab {
+    padding: 12px 4px;
+    font-size: 13px;
+    min-height: 44px;
   }
 
   .app-header__logo {

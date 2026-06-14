@@ -69,6 +69,7 @@ import {
   enrichLocksWithMintDecimals,
 } from '../components/lockTable'
 import { renderSearchResults } from '../components/publicLockSearch'
+import { attachSiteFooterHandlers } from '../components/siteFooter'
 import { renderWalletBar } from '../components/walletPanel'
 let pendingLockInput: CreateLockInput | null = null
 let pendingPreview: PreviewLock | null = null
@@ -234,6 +235,7 @@ function refreshPublicLocksDisplay(): void {
   results.innerHTML = renderSearchResults(
     filterSearchLocks(publicLocksCache, searchIncludeUnlocked),
     false,
+    { includeUnlocked: searchIncludeUnlocked },
   )
 }
 
@@ -649,7 +651,7 @@ async function refreshPublicSearchSection(): Promise<void> {
 
   if (!query.trim()) {
     clearSearchCache()
-    resultsHost.innerHTML = renderSearchResults([], false)
+    resultsHost.innerHTML = ''
     return
   }
 
@@ -667,6 +669,7 @@ async function refreshPublicSearchSection(): Promise<void> {
     resultsHost.innerHTML = renderSearchResults(
       filterSearchLocks(publicLocksCache, searchIncludeUnlocked),
       false,
+      { includeUnlocked: searchIncludeUnlocked },
     )
     return
   }
@@ -682,6 +685,7 @@ async function refreshPublicSearchSection(): Promise<void> {
     resultsHost.innerHTML = renderSearchResults(
       filterSearchLocks(locks, searchIncludeUnlocked),
       false,
+      { includeUnlocked: searchIncludeUnlocked },
     )
   } catch (error) {
     setLastError(formatLockerError(error, getSelectedClusterLabel()))
@@ -1138,6 +1142,7 @@ function attachPublicSearchHandlers(): void {
 }
 
 export function attachAppHandlers(): void {
+  attachSiteFooterHandlers()
   attachClusterHandlers()
   attachWalletHandlers()
   attachCreateLockHandlers()

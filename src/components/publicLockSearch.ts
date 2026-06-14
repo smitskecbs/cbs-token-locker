@@ -20,6 +20,7 @@ export function renderSearchResults(
     errorMessage?: string | null
     errorDetails?: string | null
     hintMessage?: string | null
+    includeUnlocked?: boolean
   },
 ): string {
   if (loading) {
@@ -38,7 +39,9 @@ export function renderSearchResults(
     `
   }
 
-  return renderLockSummaryList(locks)
+  return renderLockSummaryList(locks, Date.now(), {
+    includeUnlocked: options?.includeUnlocked ?? false,
+  })
 }
 
 export function renderSearchTabContent(
@@ -91,7 +94,7 @@ export function renderSearchTabContent(
       </label>
       <p class="search-hint">${escapeHtml(getSearchTooShortMessage())}</p>
       <div id="publicLockSearchResults">
-        ${renderSearchResults(locks, loading, options)}
+        ${renderSearchResults(locks, loading, { ...options, includeUnlocked })}
       </div>
     </div>
   `

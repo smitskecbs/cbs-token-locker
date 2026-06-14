@@ -143,11 +143,24 @@ export function updateLockTableRow(
   }
 }
 
-export function renderLockSummaryList(locks: LockRecord[], now = Date.now()): string {
+export function renderLockSummaryList(
+  locks: LockRecord[],
+  now = Date.now(),
+  options?: { includeUnlocked?: boolean },
+): string {
   if (locks.length === 0) {
+    if (options?.includeUnlocked) {
+      return `
+        <div class="empty-state-panel">
+          <p class="empty-state__body">No matching locks found.</p>
+        </div>
+      `
+    }
+
     return `
       <div class="empty-state-panel">
-        <p class="empty-state__body">No matching locks found.</p>
+        <p class="empty-state__body">No active locks found.</p>
+        <p class="empty-state__hint">Try searching by token mint, wallet address, project name, or lock account.</p>
       </div>
     `
   }

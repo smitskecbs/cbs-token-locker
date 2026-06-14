@@ -40,6 +40,7 @@ export function renderCreateLockForm(): string {
             maxlength="48"
             placeholder="My project"
           />
+          <span class="field-hint">Name shown on the public lock page.</span>
         </label>
 
         <label class="field">
@@ -53,6 +54,7 @@ export function renderCreateLockForm(): string {
             placeholder="Mint address"
             spellcheck="false"
           />
+          <span class="field-hint">Paste the SPL token mint address you want to lock.</span>
         </label>
       </div>
 
@@ -63,6 +65,7 @@ export function renderCreateLockForm(): string {
             <option value="spl">SPL Token</option>
             <option value="lp">LP Token</option>
           </select>
+          <span class="field-hint">Choose SPL Token or LP Token.</span>
         </label>
 
         <label class="field">
@@ -76,6 +79,7 @@ export function renderCreateLockForm(): string {
             required
             placeholder="1000"
           />
+          <span class="field-hint">Enter the normal token amount, not raw decimals.</span>
         </label>
       </div>
 
@@ -105,6 +109,7 @@ export function renderCreateLockForm(): string {
           />
         </label>
       </div>
+      <p class="field-hint field-hint--row">Tokens can only be unlocked after this date and time.</p>
 
       <label class="checkbox-field">
         <input

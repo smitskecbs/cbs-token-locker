@@ -17,11 +17,16 @@ export function renderWalletBar(): string {
     })
     .join('')
 
-  const connectedAddress =
+  const connectedRow =
     state.status === 'connected' && state.address
       ? `
-        <p class="wallet-bar__connected-label">Connected</p>
-        <p class="wallet-bar__address mono" title="${escapeHtml(state.address)}">${escapeHtml(formatWalletAddress(state.address, 4))}</p>
+        <div class="wallet-bar__connected">
+          <p class="wallet-bar__connected-line">
+            <span class="wallet-bar__connected-dot" aria-hidden="true">🟢</span>
+            Connected:
+            <span class="wallet-bar__address mono" title="${escapeHtml(state.address)}">${escapeHtml(formatWalletAddress(state.address, 4))}</span>
+          </p>
+        </div>
       `
       : ''
 
@@ -72,7 +77,7 @@ export function renderWalletBar(): string {
         Connect
       </button>
 
-      ${connectedAddress}
+      ${connectedRow}
       ${disconnectButton}
       ${errorMessage}
     </div>
