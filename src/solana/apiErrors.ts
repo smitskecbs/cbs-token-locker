@@ -1,7 +1,7 @@
 import { isSolanaError } from '@solana/kit'
 
-import { RPC_RATE_LIMIT_MESSAGE } from '../../src/state/rpcActivityStore.ts'
-import { isRpcRateLimitError } from '../../src/solana/rpcFetch.ts'
+import { RPC_RATE_LIMIT_MESSAGE } from '../state/rpcActivityStore'
+import { isRpcRateLimitError } from './rpcFetch'
 
 export type ApiErrorCode =
   | 'RPC_RATE_LIMIT'

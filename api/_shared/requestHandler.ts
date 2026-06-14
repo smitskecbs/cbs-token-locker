@@ -7,7 +7,7 @@ import {
   invalidLockAccountResponse,
   invalidSearchParamsResponse,
   type ApiErrorBody,
-} from './apiErrors.ts'
+} from '../../src/solana/apiErrors.ts'
 import {
   fetchLocksByOwner,
   fetchOnChainLock,
