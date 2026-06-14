@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-import { CBS_LOCKER_PROGRAM_ID } from '../constants.js'
-import { logApiRequestCluster } from '../rpcConfig.js'
-import { resolveCluster, resolveRequestUrl, setCors } from '../http.js'
+import { CBS_LOCKER_PROGRAM_ID } from '../../serverless/constants.js'
+import { logApiRequestCluster } from '../../serverless/rpcConfig.js'
+import { resolveCluster, resolveRequestUrl, setCors } from '../../serverless/http.js'
 
 const REPOSITORY_URL =
   process.env.CBS_LOCKER_REPOSITORY_URL ||

@@ -7,14 +7,14 @@ import {
   invalidLockAccountResponse,
   invalidSearchParamsResponse,
   type ApiErrorBody,
-} from '../apiErrors.ts'
-import { fetchLocksByOwner, searchOnChainLocks } from '../lockService.ts'
-import { fetchOnChainLock } from '../fetchLock.ts'
-import { logApiRequestCluster } from '../rpcConfig.ts'
-import type { SolanaNetwork } from '../cluster.ts'
-import { CBS_LOCKER_PROGRAM_ID } from '../constants.ts'
-import { parseRequestCluster } from '../cluster.ts'
-import type { LockSearchField } from '../types.ts'
+} from './apiErrors.ts'
+import { fetchLocksByOwner, searchOnChainLocks } from './lockService.ts'
+import { fetchOnChainLock } from './fetchLock.ts'
+import { logApiRequestCluster } from './rpcConfig.ts'
+import type { SolanaNetwork } from './cluster.ts'
+import { CBS_LOCKER_PROGRAM_ID } from './constants.ts'
+import { parseRequestCluster } from './cluster.ts'
+import type { LockSearchField } from './types.ts'
 
 const REPOSITORY_URL =
   process.env.CBS_LOCKER_REPOSITORY_URL ||

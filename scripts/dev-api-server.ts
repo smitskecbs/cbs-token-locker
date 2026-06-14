@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 
 import { logApiRpcConfiguration } from '../src/solana/config.ts'
 import { CBS_LOCKER_PROGRAM_ID } from '../src/solana/programId.ts'
-import { createNodeResponseSink, handleApiRequest } from '../api/_shared/requestHandler.ts'
+import { createNodeResponseSink, handleApiRequest } from '../serverless/requestHandler.ts'
 
 const PORT = Number(process.env.LOCK_API_PORT || 8787)
 

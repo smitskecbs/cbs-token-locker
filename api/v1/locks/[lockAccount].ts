@@ -5,10 +5,10 @@ import {
   classifyApiError,
   getErrorMessage,
   invalidLockAccountResponse,
-} from '../../apiErrors.js'
-import { fetchOnChainLock } from '../../fetchLock.js'
-import { readLockAccount, resolveCluster, resolveRequestUrl, setCors } from '../../http.js'
-import { logApiRequestCluster } from '../../rpcConfig.js'
+} from '../../../serverless/apiErrors.js'
+import { fetchOnChainLock } from '../../../serverless/fetchLock.js'
+import { readLockAccount, resolveCluster, resolveRequestUrl, setCors } from '../../../serverless/http.js'
+import { logApiRequestCluster } from '../../../serverless/rpcConfig.js'
 
 export default async function handler(
   request: VercelRequest,

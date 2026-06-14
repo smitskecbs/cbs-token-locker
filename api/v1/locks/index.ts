@@ -5,10 +5,10 @@ import {
   classifyApiError,
   getErrorMessage,
   invalidSearchParamsResponse,
-} from '../../apiErrors.js'
-import { readSearchField, resolveCluster, resolveRequestUrl, setCors } from '../../http.js'
-import { fetchLocksByOwner, searchOnChainLocks } from '../../lockService.js'
-import { logApiRequestCluster } from '../../rpcConfig.js'
+} from '../../../serverless/apiErrors.js'
+import { readSearchField, resolveCluster, resolveRequestUrl, setCors } from '../../../serverless/http.js'
+import { fetchLocksByOwner, searchOnChainLocks } from '../../../serverless/lockService.js'
+import { logApiRequestCluster } from '../../../serverless/rpcConfig.js'
 
 export default async function handler(
   request: VercelRequest,
