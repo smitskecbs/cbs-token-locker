@@ -12,12 +12,12 @@ import {
   fetchLocksByOwner,
   fetchOnChainLock,
   searchOnChainLocks,
-} from '../src/solana/client.ts'
-import { logApiRequestCluster } from '../src/solana/config.ts'
-import type { SolanaNetwork } from '../src/solana/config.ts'
-import { CBS_LOCKER_PROGRAM_ID } from '../src/solana/programId.ts'
-import { parseRequestCluster } from '../src/solana/requestCluster.ts'
-import type { LockSearchField } from '../src/types/lock.ts'
+} from '../../src/solana/client.ts'
+import { logApiRequestCluster } from '../../src/solana/config.ts'
+import type { SolanaNetwork } from '../../src/solana/config.ts'
+import { CBS_LOCKER_PROGRAM_ID } from '../../src/solana/programId.ts'
+import { parseRequestCluster } from '../../src/solana/requestCluster.ts'
+import type { LockSearchField } from '../../src/types/lock.ts'
 
 const REPOSITORY_URL =
   process.env.CBS_LOCKER_REPOSITORY_URL ||

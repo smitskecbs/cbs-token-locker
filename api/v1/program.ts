@@ -1,1 +1,1 @@
-export { default } from '../../server/vercelHandler.ts'
+export { default } from '../_shared/vercelHandler.ts'
