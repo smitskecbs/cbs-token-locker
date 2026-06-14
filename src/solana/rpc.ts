@@ -30,7 +30,7 @@ export function getSolanaRpc(network: SolanaNetwork = getSelectedNetwork()): Sol
 
   cachedRpc = createSolanaRpc(getRpcUrl(network), {
     fetch: getThrottledFetch(),
-  })
+  } as Parameters<typeof createSolanaRpc>[1])
   cachedNetwork = network
   return cachedRpc
 }

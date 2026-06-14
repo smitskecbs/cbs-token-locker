@@ -1,5 +1,4 @@
 import { isDevelopmentMode } from '../state/debugStore'
-import { copyTextToClipboard } from '../utils/copyText'
 import { escapeHtml } from '../utils/html'
 
 export type ProgressStepState = 'pending' | 'active' | 'success' | 'error'
@@ -49,7 +48,7 @@ export type ProgressModalShellConfig = {
 }
 
 export function renderProgressModalShell(config: ProgressModalShellConfig): string {
-  const dialogClass = config.dialogClass ?? 'unlock-progress-dialog'
+  const dialogClass = config.dialogClass ?? 'progress-modal-dialog unlock-progress-dialog'
 
   return `
     <div class="modal-overlay" id="${config.modalId}" ${config.dataAttr}>
@@ -80,16 +79,13 @@ export function renderProgressModalShell(config: ProgressModalShellConfig): stri
 
         <p class="form-error" id="${config.errorId}" role="alert" hidden></p>
 
-        <div class="unlock-progress-debug" id="${config.debugBlockId}" hidden>
-          <p class="simulation-debug__label">Debug output</p>
+        <details class="progress-debug-details" id="${config.debugBlockId}" hidden>
+          <summary class="progress-debug-details__summary">Show details</summary>
           <pre class="mono simulation-debug__pre" id="${config.debugTextId}"></pre>
-        </div>
+        </details>
 
         <div class="modal-actions">
           ${config.extraActionsHtml ?? ''}
-          <button type="button" class="secondary-btn" id="${config.copyDebugBtnId}" hidden>
-            Copy Debug Output
-          </button>
           <button type="button" class="secondary-btn" id="${config.closeBtnId}" hidden>
             Close
           </button>
@@ -136,7 +132,6 @@ export function createProgressModalController<TStep extends string>(
   const errorElement = modalRoot.querySelector<HTMLElement>(selectors.error)
   const debugBlock = modalRoot.querySelector<HTMLElement>(selectors.debugBlock)
   const debugText = modalRoot.querySelector<HTMLElement>(selectors.debugText)
-  const copyButton = modalRoot.querySelector<HTMLButtonElement>(selectors.copyButton)
   const closeButton = modalRoot.querySelector<HTMLButtonElement>(selectors.closeButton)
   const successDetails = selectors.successDetails
     ? modalRoot.querySelector<HTMLElement>(selectors.successDetails)
@@ -214,10 +209,6 @@ export function createProgressModalController<TStep extends string>(
       if (debugBlock) {
         debugBlock.hidden = false
       }
-
-      if (copyButton) {
-        copyButton.hidden = false
-      }
     } else if (isDevelopmentMode()) {
       debugTextValue = message
 
@@ -227,10 +218,6 @@ export function createProgressModalController<TStep extends string>(
 
       if (debugBlock) {
         debugBlock.hidden = false
-      }
-
-      if (copyButton) {
-        copyButton.hidden = false
       }
     }
 
@@ -242,19 +229,6 @@ export function createProgressModalController<TStep extends string>(
   const close = (): void => {
     modalRoot.remove()
   }
-
-  copyButton?.addEventListener('click', async () => {
-    if (!debugTextValue) {
-      return
-    }
-
-    const copied = await copyTextToClipboard(debugTextValue)
-    copyButton.textContent = copied ? 'Copied' : 'Copy Failed'
-
-    window.setTimeout(() => {
-      copyButton.textContent = 'Copy Debug Output'
-    }, 2000)
-  })
 
   closeButton?.addEventListener('click', () => {
     close()

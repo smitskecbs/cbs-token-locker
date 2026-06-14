@@ -9,7 +9,6 @@ import {
   stopLockDetailLiveRefresh,
 } from '../components/lockDetailPage'
 import { renderPublicLockSearch } from '../components/publicLockSearch'
-import { renderSafetyNotice } from '../components/safetyNotice'
 import { renderSiteFooter } from '../components/siteFooter'
 import type { AppRoute } from './index'
 
@@ -36,11 +35,10 @@ export function renderRoute(route: AppRoute): void {
 
   if (route.name === 'locks') {
     stopLockDetailLiveRefresh()
-    document.title = 'Public On-chain Locks — CBS Token Locker'
+    document.title = 'Search Locks — CBS Token Locker'
     app.innerHTML = `
-      <main class="app-shell">
+      <main class="app-shell app-shell--simple">
         ${renderPublicLockSearch([], route.search ?? '', route.field ?? 'all', Boolean(route.search))}
-        ${renderSafetyNotice('public-locks')}
         ${renderSiteFooter()}
       </main>
     `

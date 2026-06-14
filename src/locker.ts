@@ -6,8 +6,6 @@ import {
   fetchOnChainLock,
   searchOnChainLocks,
   unlockOnChainLock,
-  toLockRecord,
-  OnChainLockerError,
 } from './solana/client'
 import type {
   CreateLockInput,
@@ -70,6 +68,10 @@ export function validateCreateLockInput(input: CreateLockInput): void {
     throw new LockerValidationError('Unlock date is required.')
   }
 
+  if (!input.unlockTime.trim()) {
+    throw new LockerValidationError('Unlock time is required.')
+  }
+
   const unlockAt = combineUnlockDateTime(input.unlockDate, input.unlockTime)
 
   if (Number.isNaN(new Date(unlockAt).getTime())) {
@@ -113,6 +115,42 @@ export async function searchLocks(
   field: LockSearchField = 'all',
 ): Promise<LockRecord[]> {
   return searchOnChainLocks(query, field)
+}
+
+export function filterActiveWalletLocks(
+  locks: LockRecord[],
+  now = Date.now(),
+): LockRecord[] {
+  return locks.filter((lock) => {
+    const status = getLockStatusForRecord(lock, now)
+    return status === 'active' || status === 'unlock_available'
+  })
+}
+
+/** Default search results: active and unlock-available only. */
+export function filterSearchLocks(
+  locks: LockRecord[],
+  includeUnlocked = false,
+  now = Date.now(),
+): LockRecord[] {
+  if (includeUnlocked) {
+    return locks
+  }
+
+  return filterActiveWalletLocks(locks, now)
+}
+
+export function sortLocksNewestFirst(locks: LockRecord[]): LockRecord[] {
+  return [...locks].sort((left, right) => {
+    return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  })
+}
+
+export function filterHistoryWalletLocks(
+  locks: LockRecord[],
+  now = Date.now(),
+): LockRecord[] {
+  return locks.filter((lock) => getLockStatusForRecord(lock, now) === 'unlocked')
 }
 
 export function filterMyLocks(

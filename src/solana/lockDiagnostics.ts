@@ -1,4 +1,4 @@
-import { address, fetchEncodedAccount, type Address } from '@solana/kit'
+import { address, fetchEncodedAccount } from '@solana/kit'
 
 import type { LockRecord } from '../types/lock'
 import { safeJsonStringify } from '../utils/safeSerialize'

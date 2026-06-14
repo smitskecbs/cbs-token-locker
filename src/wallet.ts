@@ -1,4 +1,4 @@
-import { getBase58Encoder } from '@solana/codecs-strings'
+import { getBase58Decoder } from '@solana/codecs-strings'
 import { getWallets } from '@wallet-standard/app'
 
 import {
@@ -487,7 +487,7 @@ function createWalletStandardProvider(
         signature:
           typeof signature === 'string'
             ? signature
-            : getBase58Encoder().encode(signature),
+            : getBase58Decoder().decode(signature),
       }
     },
   }

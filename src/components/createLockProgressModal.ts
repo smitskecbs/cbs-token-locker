@@ -30,7 +30,6 @@ const MODAL_SELECTORS = {
   debugText: '#createLockProgressDebugText',
   copyButton: '#createLockProgressCopyDebugBtn',
   closeButton: '#createLockProgressCloseBtn',
-  successDetails: '#createLockProgressSuccessDetails',
 }
 
 export type CreateLockSuccessDetails = {
@@ -47,25 +46,6 @@ export type CreateLockProgressController = {
   getDebugText: () => string
 }
 
-function renderCreateLockSuccessDetails(): string {
-  return `
-    <dl class="detail-list create-lock-progress-details">
-      <div class="detail-item">
-        <dt>Lock account</dt>
-        <dd class="mono" data-create-lock-result-lock>n/a</dd>
-      </div>
-      <div class="detail-item">
-        <dt>Vault account</dt>
-        <dd class="mono" data-create-lock-result-vault>n/a</dd>
-      </div>
-      <div class="detail-item">
-        <dt>Transaction signature</dt>
-        <dd class="mono" data-create-lock-result-signature>n/a</dd>
-      </div>
-    </dl>
-  `
-}
-
 export function renderCreateLockProgressModal(): string {
   const steps = CREATE_LOCK_PROGRESS_STEPS.map((step) =>
     renderProgressStep(step.id, step.label, 'pending'),
@@ -75,14 +55,13 @@ export function renderCreateLockProgressModal(): string {
     modalId: 'createLockProgressModal',
     dataAttr: 'data-create-lock-progress-modal',
     headingId: 'createLockProgressHeading',
-    title: 'Creating On-Chain Lock',
+    title: 'Creating lock',
     leadId: 'createLockProgressLead',
-    lead: 'Keep this window open while your lock transaction is prepared, signed, and confirmed.',
+    lead: 'Approve in your wallet when prompted.',
     stepsHtml: steps,
     successId: 'createLockProgressSuccess',
-    successMessage: 'Lock created successfully.',
-    successDetailsId: 'createLockProgressSuccessDetails',
-    successDetailsHtml: renderCreateLockSuccessDetails(),
+    successMessage:
+      'Lock created successfully. Your tokens are now held in an on-chain vault until the unlock date.',
     errorId: 'createLockProgressError',
     debugBlockId: 'createLockProgressDebug',
     debugTextId: 'createLockProgressDebugText',
@@ -106,39 +85,22 @@ export function createCreateLockProgressController(
     modalRoot,
     MODAL_SELECTORS,
     {
-      heading: 'Create Lock Failed',
-      lead: 'The lock was not created. Review the error below and try again.',
+      heading: 'Lock failed',
+      lead: 'Something went wrong. Try again.',
     },
   )
 
   const viewLockButton = modalRoot.querySelector<HTMLButtonElement>('#createLockProgressViewLockBtn')
   const copyLinkButton = modalRoot.querySelector<HTMLButtonElement>('#createLockProgressCopyLinkBtn')
-  const lockResultElement = modalRoot.querySelector<HTMLElement>('[data-create-lock-result-lock]')
-  const vaultResultElement = modalRoot.querySelector<HTMLElement>('[data-create-lock-result-vault]')
-  const signatureResultElement = modalRoot.querySelector<HTMLElement>(
-    '[data-create-lock-result-signature]',
-  )
 
   let successLockAccount: string | null = null
 
   const showSuccess = (details: CreateLockSuccessDetails): void => {
     successLockAccount = details.lockAccount
 
-    if (lockResultElement) {
-      lockResultElement.textContent = details.lockAccount
-    }
-
-    if (vaultResultElement) {
-      vaultResultElement.textContent = details.vaultAccount
-    }
-
-    if (signatureResultElement) {
-      signatureResultElement.textContent = details.signature
-    }
-
     baseController.showSuccess({
-      heading: 'Lock Created',
-      lead: 'Your on-chain lock is live and verified. Share the lock page or review the account details below.',
+      heading: 'Lock created successfully',
+      lead: 'Your tokens are now held in an on-chain vault until the unlock date.',
     })
 
     if (viewLockButton) {

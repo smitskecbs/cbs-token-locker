@@ -6,14 +6,12 @@ import { fetchOnChainLock } from '../solana/client'
 import { fetchMintDecimalsForLock } from '../solana/mintDecimals'
 import { inspectUnlockedLock } from '../solana/unlockVerification'
 import { LIVE_REFRESH_INTERVAL_MS } from '../state/rpcActivityStore'
-import { CBS_LOCKER_PROGRAM_ID } from '../solana/programId'
 import type { LockRecord } from '../types/lock'
 import { formatDateTime, formatTokenType, formatWalletAddress } from '../utils/format'
 import { escapeHtml } from '../utils/html'
 import {
   canUnlockLock,
   formatLockAmountDisplay,
-  formatRemainingTime,
   getDisplayLockStatus,
   isUnlockTimeReached,
   renderLockStatusMarkup,
@@ -24,8 +22,7 @@ import {
   getWalletConnectionState,
   subscribeToWalletConnection,
 } from '../wallet'
-import { renderSafetyNotice } from './safetyNotice'
-import { renderDexRecognitionNotice, renderVerificationBadge } from './verificationBadge'
+
 import { renderSiteFooter } from './siteFooter'
 
 export type LockDetailContext = {
@@ -56,7 +53,14 @@ export function stopLockDetailLiveRefresh(): void {
 
 function renderUnlockSection(lock: LockRecord, connectedWallet: string | null, now = Date.now()): string {
   if (lock.isUnlocked) {
-    return ''
+    return `
+      <div id="lockUnlockSection" class="lock-detail-unlock">
+        <div class="success-panel" id="unlockSuccessPanel" role="status">
+          <p class="success-panel__title">Tokens unlocked successfully.</p>
+          <p class="success-panel__body">Tokens have been returned to your wallet.</p>
+        </div>
+      </div>
+    `
   }
 
   if (!isUnlockTimeReached(lock, now)) {
@@ -79,7 +83,6 @@ function renderUnlockSection(lock: LockRecord, connectedWallet: string | null, n
 
   return `
     <div id="lockUnlockSection" class="lock-detail-unlock">
-      <p id="unlockSuccessMessage" role="status" hidden></p>
       <p class="form-error" id="unlockErrorMessage" role="alert" hidden></p>
       <button type="button" class="unlock-btn" id="unlockTokensBtn">
         Unlock Tokens
@@ -90,25 +93,11 @@ function renderUnlockSection(lock: LockRecord, connectedWallet: string | null, n
 
 function renderLoadingState(lockAccount: string): string {
   return `
-    <main class="app-shell">
-      <section class="hero-card" aria-live="polite">
-        <p class="hero-eyebrow">Verifying on-chain lock</p>
-        <h1 class="hero-title">Loading Lock Explorer</h1>
-        <p class="hero-text">
-          Reading lock account
-          <span class="mono">${escapeHtml(formatWalletAddress(lockAccount, 8))}</span>
-          directly from Solana.
-        </p>
+    <main class="app-shell app-shell--simple">
+      <section class="main-card" aria-live="polite">
+        <p class="empty-state">Loading lock ${escapeHtml(formatWalletAddress(lockAccount, 6))}…</p>
       </section>
     </main>
-  `
-}
-
-function renderUnverifiedNotice(): string {
-  return `
-    <div class="verification-warning" role="alert">
-      This lock could not be verified on-chain.
-    </div>
   `
 }
 
@@ -122,90 +111,46 @@ function renderLockDetails(
   const amount = formatLockAmountDisplay(lock, mintDecimals)
   const orbUrl = getOrbAccountUrl(lock.lockAccount, getSelectedNetwork())
 
-  const verificationMarkup = lock.onChainVerified
-    ? `${renderVerificationBadge(true, 'CBS verified on-chain')}${renderDexRecognitionNotice()}`
-    : renderUnverifiedNotice()
+  const verificationLabel = lock.onChainVerified
+    ? '<p class="certificate-badge">Verified On-Chain</p>'
+    : '<p class="certificate-badge certificate-badge--warning">Not verified</p>'
 
   return `
-    <main class="app-shell">
-      <section class="hero-card lock-detail-card" aria-labelledby="lock-detail-heading">
-        <p class="hero-eyebrow">On-chain Lock Explorer</p>
-        <h1 class="hero-title lock-detail-title" id="lock-detail-heading">
-          ${escapeHtml(lock.projectName)}
-        </h1>
-        <p class="lock-detail-id">
-          Lock Account:
-          <span class="mono">${escapeHtml(lock.lockAccount)}</span>
-        </p>
-        ${verificationMarkup}
+    <main class="app-shell app-shell--simple">
+      <section class="main-card lock-certificate" aria-labelledby="lock-detail-heading">
+        <header class="certificate-header">
+          <p class="certificate-eyebrow">CBS Token Locker</p>
+          <h1 class="certificate-title" id="lock-detail-heading">${escapeHtml(lock.projectName)}</h1>
+          ${verificationLabel}
+        </header>
 
-        <dl class="detail-list detail-list--spacious">
-          <div class="detail-item">
-            <dt>Program ID</dt>
-            <dd class="mono">${escapeHtml(lock.programId)}</dd>
+        <dl class="certificate-facts">
+          <div class="certificate-fact">
+            <dt>Amount</dt>
+            <dd data-lock-amount-main>${escapeHtml(amount.human)}</dd>
           </div>
-          <div class="detail-item">
-            <dt>Token Mint</dt>
-            <dd class="mono">${escapeHtml(lock.mint)}</dd>
+          <div class="certificate-fact">
+            <dt>Status</dt>
+            <dd><span id="lockStatusBadge">${renderLockStatusMarkup(status)}</span></dd>
           </div>
-          <div class="detail-item">
-            <dt>Token Type</dt>
-            <dd>${escapeHtml(formatTokenType(lock.tokenType))}</dd>
+          <div class="certificate-fact">
+            <dt>Unlock date</dt>
+            <dd id="lockRemainingTime">${escapeHtml(formatDateTime(lock.unlockAt))}</dd>
           </div>
-          <div class="detail-item">
-            <dt>Locked Amount</dt>
-            <dd>
-              ${escapeHtml(amount.human)}
-              <br>
-              <small>Raw amount: ${escapeHtml(amount.raw)}</small>
-            </dd>
+          <div class="certificate-fact">
+            <dt>Owner</dt>
+            <dd class="mono">${escapeHtml(formatWalletAddress(lock.owner, 6))}</dd>
           </div>
-          <div class="detail-item">
-            <dt>Vault Account</dt>
-            <dd class="mono">${escapeHtml(lock.vault)}</dd>
+          <div class="certificate-fact">
+            <dt>Vault</dt>
+            <dd class="mono">${escapeHtml(formatWalletAddress(lock.vault, 6))}</dd>
           </div>
-          <div class="detail-item">
-            <dt>Locker Wallet</dt>
-            <dd class="mono">${escapeHtml(formatWalletAddress(lock.owner, 8))}</dd>
-          </div>
-          <div class="detail-item">
-            <dt>Creation Date</dt>
-            <dd>${escapeHtml(formatDateTime(lock.createdAt))}</dd>
-          </div>
-          <div class="detail-item">
-            <dt>Unlock Date</dt>
-            <dd>${escapeHtml(formatDateTime(lock.unlockAt))}</dd>
-          </div>
-          <div class="detail-item">
-            <dt>Remaining Time</dt>
-            <dd id="lockRemainingTime">${escapeHtml(formatRemainingTime(lock.unlockAt, now, lock.isUnlocked))}</dd>
-          </div>
-          <div class="detail-item">
-            <dt>Current Status</dt>
-            <dd>
-              <span id="lockStatusBadge">
-                ${renderLockStatusMarkup(status)}
-              </span>
-            </dd>
-          </div>
-          ${
-            lock.createSignature
-              ? `
-                <div class="detail-item">
-                  <dt>Create Signature</dt>
-                  <dd class="mono">${escapeHtml(lock.createSignature)}</dd>
-                </div>
-              `
-              : ''
-          }
         </dl>
 
         ${renderUnlockSection(lock, connectedWallet, now)}
 
         <div class="lock-detail-actions">
-          <button type="button" class="primary-btn" id="copyLockLinkBtn">
-            Copy Link
-          </button>
+          <button type="button" class="primary-btn" id="copyLockLinkBtn">Copy Link</button>
           <a
             class="secondary-btn"
             href="${escapeHtml(orbUrl)}"
@@ -214,13 +159,45 @@ function renderLockDetails(
           >
             View on Orb
           </a>
-          <a class="secondary-btn" href="/" data-router-link>
-            Back to Home
+          <a class="secondary-btn" href="/" data-router-link data-app-tab-link="locks">
+            Back
           </a>
         </div>
-      </section>
 
-      ${renderSafetyNotice(`lock-${lock.lockAccount}`)}
+        <details class="advanced-details advanced-details--inline">
+          <summary class="advanced-details__summary">Advanced details</summary>
+          <div class="advanced-details__content">
+            <dl class="detail-list">
+              <div class="detail-item">
+                <dt>Lock account</dt>
+                <dd class="mono">${escapeHtml(lock.lockAccount)}</dd>
+              </div>
+              <div class="detail-item">
+                <dt>Token mint</dt>
+                <dd class="mono">${escapeHtml(lock.mint)}</dd>
+              </div>
+              <div class="detail-item">
+                <dt>Token type</dt>
+                <dd>${escapeHtml(formatTokenType(lock.tokenType))}</dd>
+              </div>
+              <div class="detail-item">
+                <dt>Program ID</dt>
+                <dd class="mono">${escapeHtml(lock.programId)}</dd>
+              </div>
+              ${
+                lock.createSignature
+                  ? `
+                    <div class="detail-item">
+                      <dt>Signature</dt>
+                      <dd class="mono">${escapeHtml(lock.createSignature)}</dd>
+                    </div>
+                  `
+                  : ''
+              }
+            </dl>
+          </div>
+        </details>
+      </section>
       ${renderSiteFooter()}
     </main>
   `
@@ -233,25 +210,16 @@ export function renderLockDetailLoading(lockAccount: string): string {
 export function renderLockDetailPage(context: LockDetailContext, lockAccount: string): string {
   if (!context.lock) {
     return `
-      <main class="app-shell">
-        <section class="hero-card" aria-labelledby="lock-not-found-heading">
-          <h1 class="hero-title" id="lock-not-found-heading">On-chain Lock Not Found</h1>
-          <p class="hero-text">
-            No CBS Token Locker account was found at
-            <strong class="mono">${escapeHtml(lockAccount)}</strong>
-            for program
-            <strong class="mono">${escapeHtml(CBS_LOCKER_PROGRAM_ID)}</strong>.
+      <main class="app-shell app-shell--simple">
+        <section class="main-card" aria-labelledby="lock-not-found-heading">
+          <h1 class="certificate-title" id="lock-not-found-heading">Lock not found</h1>
+          <p class="empty-state__body">
+            No lock at <span class="mono">${escapeHtml(formatWalletAddress(lockAccount, 6))}</span>.
           </p>
-          <div class="hero-actions">
-            <a class="primary-btn" href="/locks" data-router-link>
-              Search Public Locks
-            </a>
-            <a class="secondary-btn" href="/" data-router-link>
-              Back to Home
-            </a>
+          <div class="lock-detail-actions">
+            <a class="primary-btn" href="/" data-router-link>Home</a>
           </div>
         </section>
-        ${renderSafetyNotice('not-found')}
         ${renderSiteFooter()}
       </main>
     `
@@ -310,7 +278,7 @@ function updateLockDetailLiveState(lock: LockRecord, connectedWallet: string | n
   const unlockSection = document.querySelector<HTMLElement>('#lockUnlockSection')
 
   if (remainingElement) {
-    remainingElement.textContent = formatRemainingTime(lock.unlockAt, now, lock.isUnlocked)
+    remainingElement.textContent = formatDateTime(lock.unlockAt)
   }
 
   if (statusElement) {
@@ -319,7 +287,7 @@ function updateLockDetailLiveState(lock: LockRecord, connectedWallet: string | n
 
   if (unlockSection) {
     if (lock.isUnlocked) {
-      unlockSection.outerHTML = '<div id="lockUnlockSection"></div>'
+      unlockSection.outerHTML = renderUnlockSection(lock, connectedWallet, now)
     } else {
       unlockSection.outerHTML = renderUnlockSection(lock, connectedWallet, now)
 
@@ -330,7 +298,7 @@ function updateLockDetailLiveState(lock: LockRecord, connectedWallet: string | n
   }
 }
 
-function attachUnlockHandler(lock: LockRecord, lockAccount: string): void {
+function attachUnlockHandler(lock: LockRecord, _lockAccount: string): void {
   const unlockButton = document.querySelector<HTMLButtonElement>('#unlockTokensBtn')
 
   if (!unlockButton) {
@@ -396,12 +364,12 @@ export function attachLockDetailHandlers(
         await navigator.clipboard.writeText(url)
         copyButton.textContent = 'Link Copied'
         window.setTimeout(() => {
-          copyButton.textContent = 'Copy Link'
+          copyButton.textContent = 'Copy Lock Link'
         }, 2000)
       } catch {
         copyButton.textContent = 'Copy Failed'
         window.setTimeout(() => {
-          copyButton.textContent = 'Copy Link'
+          copyButton.textContent = 'Copy Lock Link'
         }, 2000)
       }
     })

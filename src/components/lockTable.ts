@@ -4,10 +4,9 @@ import type { LockRecord } from '../types/lock'
 import {
   canUnlockLock,
   formatLockAmountDisplay,
-  formatRemainingTime,
   renderLockStatusMarkup,
 } from '../utils/lockDisplay'
-import { formatDateTime, formatTokenType, formatWalletAddress } from '../utils/format'
+import { formatDateTime } from '../utils/format'
 import { escapeHtml } from '../utils/html'
 
 export async function enrichLocksWithMintDecimals(locks: LockRecord[]): Promise<void> {
@@ -22,14 +21,14 @@ export async function enrichLocksWithMintDecimals(locks: LockRecord[]): Promise<
   }
 }
 
-function renderLockTableActions(
+function renderLockActions(
   lock: LockRecord,
   connectedWallet: string | null,
   now: number,
 ): string {
   const viewButton = `
     <a
-      class="secondary-btn lock-table-btn"
+      class="secondary-btn lock-card-btn"
       href="${getPublicLockPath(lock.lockAccount)}"
       data-router-link
     >
@@ -38,20 +37,43 @@ function renderLockTableActions(
   `
 
   if (!canUnlockLock(lock, connectedWallet, now)) {
-    return `<div class="lock-table-actions">${viewButton}</div>`
+    return viewButton
   }
 
   return `
-    <div class="lock-table-actions">
-      ${viewButton}
-      <button
-        type="button"
-        class="unlock-btn lock-table-btn"
-        data-unlock-lock="${escapeHtml(lock.lockAccount)}"
-      >
-        Unlock
-      </button>
-    </div>
+    ${viewButton}
+    <button
+      type="button"
+      class="unlock-btn lock-card-btn"
+      data-unlock-lock="${escapeHtml(lock.lockAccount)}"
+    >
+      Unlock
+    </button>
+  `
+}
+
+function renderLockCard(
+  lock: LockRecord,
+  connectedWallet: string | null,
+  now: number,
+): string {
+  const status = getLockStatusForRecord(lock, now)
+  const amount = formatLockAmountDisplay(lock)
+
+  return `
+    <article class="lock-card" data-lock-account="${escapeHtml(lock.lockAccount)}">
+      <div class="lock-card__top">
+        <h3 class="lock-card__title">${escapeHtml(lock.projectName)}</h3>
+        <span data-lock-status>${renderLockStatusMarkup(status)}</span>
+      </div>
+      <p class="lock-card__line">
+        <span data-lock-amount>${escapeHtml(amount.human)}</span>
+        · ${escapeHtml(formatDateTime(lock.unlockAt))}
+      </p>
+      <div class="lock-card__actions" data-lock-actions>
+        ${renderLockActions(lock, connectedWallet, now)}
+      </div>
+    </article>
   `
 }
 
@@ -60,62 +82,30 @@ export function renderLockTable(
   emptyMessage: string,
   now = Date.now(),
   connectedWallet: string | null = null,
+  options?: { emptyTitle?: string; singleLineEmpty?: boolean },
 ): string {
   if (locks.length === 0) {
-    return `<p class="empty-state">${escapeHtml(emptyMessage)}</p>`
+    if (options?.singleLineEmpty) {
+      return `
+        <div class="empty-state-panel">
+          <p class="empty-state__body">${escapeHtml(emptyMessage)}</p>
+        </div>
+      `
+    }
+
+    const emptyTitle = options?.emptyTitle ?? 'No locks yet.'
+
+    return `
+      <div class="empty-state-panel">
+        <p class="empty-state__title">${emptyTitle}</p>
+        <p class="empty-state__body">${escapeHtml(emptyMessage)}</p>
+      </div>
+    `
   }
 
-  const rows = locks
-    .map((lock) => {
-      const status = getLockStatusForRecord(lock, now)
-      const amount = formatLockAmountDisplay(lock)
-
-      return `
-        <tr data-lock-account="${escapeHtml(lock.lockAccount)}">
-          <td>
-            <a
-              class="lock-link"
-              href="${getPublicLockPath(lock.lockAccount)}"
-              data-router-link
-            >
-              ${escapeHtml(lock.projectName)}
-            </a>
-          </td>
-          <td>${escapeHtml(formatTokenType(lock.tokenType))}</td>
-          <td data-lock-amount>${escapeHtml(amount.human)}</td>
-          <td>${escapeHtml(formatDateTime(lock.unlockAt))}</td>
-          <td data-lock-status>
-            ${renderLockStatusMarkup(status)}
-          </td>
-          <td data-lock-remaining>
-            ${escapeHtml(formatRemainingTime(lock.unlockAt, now, lock.isUnlocked))}
-          </td>
-          <td data-lock-actions>
-            ${renderLockTableActions(lock, connectedWallet, now)}
-          </td>
-        </tr>
-      `
-    })
-    .join('')
-
   return `
-    <div class="lock-table-wrap">
-      <table class="lock-table">
-        <thead>
-          <tr>
-            <th>Project</th>
-            <th>Type</th>
-            <th>Amount</th>
-            <th>Unlock Date</th>
-            <th>Status</th>
-            <th>Remaining</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
+    <div class="lock-card-list">
+      ${locks.map((lock) => renderLockCard(lock, connectedWallet, now)).join('')}
     </div>
   `
 }
@@ -125,35 +115,41 @@ export function updateLockTableRow(
   connectedWallet: string | null,
   now = Date.now(),
 ): void {
-  const row = document.querySelector<HTMLTableRowElement>(
-    `tr[data-lock-account="${lock.lockAccount}"]`,
+  const card = document.querySelector<HTMLElement>(
+    `.lock-card[data-lock-account="${lock.lockAccount}"]`,
   )
 
-  if (!row) {
+  if (!card) {
     return
   }
 
   const status = getLockStatusForRecord(lock, now)
-  const statusCell = row.querySelector<HTMLElement>('[data-lock-status]')
-  const remainingCell = row.querySelector<HTMLElement>('[data-lock-remaining]')
-  const actionsCell = row.querySelector<HTMLElement>('[data-lock-actions]')
+  const amount = formatLockAmountDisplay(lock)
 
-  if (statusCell) {
-    statusCell.innerHTML = renderLockStatusMarkup(status)
+  const statusElement = card.querySelector<HTMLElement>('[data-lock-status]')
+  const amountElement = card.querySelector<HTMLElement>('[data-lock-amount]')
+  const actionsElement = card.querySelector<HTMLElement>('[data-lock-actions]')
+
+  if (statusElement) {
+    statusElement.innerHTML = renderLockStatusMarkup(status)
   }
 
-  if (remainingCell) {
-    remainingCell.textContent = formatRemainingTime(lock.unlockAt, now, lock.isUnlocked)
+  if (amountElement) {
+    amountElement.textContent = amount.human
   }
 
-  if (actionsCell) {
-    actionsCell.innerHTML = renderLockTableActions(lock, connectedWallet, now)
+  if (actionsElement) {
+    actionsElement.innerHTML = renderLockActions(lock, connectedWallet, now)
   }
 }
 
 export function renderLockSummaryList(locks: LockRecord[], now = Date.now()): string {
   if (locks.length === 0) {
-    return `<p class="empty-state">No matching on-chain locks found.</p>`
+    return `
+      <div class="empty-state-panel">
+        <p class="empty-state__body">No matching locks found.</p>
+      </div>
+    `
   }
 
   return `
@@ -165,25 +161,16 @@ export function renderLockSummaryList(locks: LockRecord[], now = Date.now()): st
 
           return `
             <li class="lock-summary-item">
-              <div class="lock-summary-item__header">
-                <a
-                  class="lock-link"
-                  href="${getPublicLockPath(lock.lockAccount)}"
-                  data-router-link
-                >
-                  ${escapeHtml(lock.projectName)}
-                </a>
-                <span class="lock-id">${escapeHtml(formatWalletAddress(lock.lockAccount, 6))}</span>
-              </div>
-              <p class="lock-summary-item__meta">
-                ${escapeHtml(formatTokenType(lock.tokenType))} ·
-                ${escapeHtml(amount.human)} ·
-                ${renderLockStatusMarkup(status)} ·
-                ${lock.onChainVerified ? 'CBS verified on-chain' : 'Verification pending'}
-              </p>
-              <p class="lock-summary-item__wallet">
-                ${escapeHtml(formatWalletAddress(lock.owner, 6))}
-              </p>
+              <a
+                class="lock-link"
+                href="${getPublicLockPath(lock.lockAccount)}"
+                data-router-link
+              >
+                ${escapeHtml(lock.projectName)}
+              </a>
+              <span class="lock-summary-item__meta">
+                ${escapeHtml(amount.human)} · ${renderLockStatusMarkup(status)}
+              </span>
             </li>
           `
         })

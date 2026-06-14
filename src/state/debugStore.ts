@@ -90,3 +90,11 @@ export function subscribeToDebugState(listener: DebugListener): () => void {
 export function isDevelopmentMode(): boolean {
   return Boolean(import.meta.env.DEV)
 }
+
+export function isDebugPanelVisible(): boolean {
+  if (!import.meta.env.DEV) {
+    return false
+  }
+
+  return new URLSearchParams(window.location.search).get('debug') === '1'
+}

@@ -6,7 +6,8 @@ import {
   formatWalletAddress,
 } from '../utils/format'
 import { escapeHtml } from '../utils/html'
-import { formatLockStatus, formatRemainingTime, getLockStatus } from '../utils/time'
+import { getLockStatus } from '../utils/time'
+import { renderLockStatusMarkup } from '../utils/lockDisplay'
 
 export function renderLockPreviewModal(preview: PreviewLock): string {
   const status = getLockStatus(preview.unlockAt)
@@ -14,16 +15,14 @@ export function renderLockPreviewModal(preview: PreviewLock): string {
   return `
     <div class="modal-overlay" id="lockPreviewModal" data-lock-preview-modal>
       <div
-        class="modal-dialog"
+        class="modal-dialog review-lock-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="lock-preview-heading"
       >
-        <p class="mode-badge mode-badge--preview">Preview Mode</p>
-        <h2 class="modal-title" id="lock-preview-heading">Lock Preview</h2>
+        <h2 class="modal-title" id="lock-preview-heading">Review lock</h2>
         <p class="modal-lead">
-          This preview is not an on-chain lock. Confirm to submit a real on-chain
-          lock transaction through your connected wallet.
+          Confirm these details, then approve in your wallet.
         </p>
 
         <dl class="detail-list">
@@ -52,21 +51,17 @@ export function renderLockPreviewModal(preview: PreviewLock): string {
             <dd>${escapeHtml(formatDateTime(preview.unlockAt))}</dd>
           </div>
           <div class="detail-item">
-            <dt>Remaining Time</dt>
-            <dd>${escapeHtml(formatRemainingTime(preview.unlockAt))}</dd>
-          </div>
-          <div class="detail-item">
-            <dt>Preview Status</dt>
-            <dd>${escapeHtml(formatLockStatus(status))}</dd>
+            <dt>Status After Lock</dt>
+            <dd>${renderLockStatusMarkup(status)}</dd>
           </div>
         </dl>
 
         <div class="modal-actions">
           <button type="button" class="secondary-btn" data-lock-preview-cancel>
-            Back
+            Cancel
           </button>
           <button type="button" class="primary-btn" data-lock-preview-confirm>
-            Create On-chain Lock
+            Create Lock
           </button>
         </div>
       </div>

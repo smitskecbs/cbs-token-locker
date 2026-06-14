@@ -1,7 +1,10 @@
 import {
   buildLockPreview,
-  filterMyLocks,
+  filterActiveWalletLocks,
+  filterHistoryWalletLocks,
+  filterSearchLocks,
   LockerValidationError,
+  sortLocksNewestFirst,
 } from '../locker'
 import { getPublicLocksPath, navigate } from '../routes'
 import { fetchWalletLocksFromApi, searchLocksFromApi } from '../services/lockApi'
@@ -9,7 +12,6 @@ import {
   getSelectedClusterLabel,
   getSelectedNetwork,
   setSelectedNetwork,
-  subscribeToClusterChanges,
 } from '../solana/cluster'
 import type { SolanaNetwork } from '../solana/config'
 import { logRpcConfiguration } from '../solana/config'
@@ -24,8 +26,14 @@ import {
   shouldPauseBackgroundRpcRefresh,
 } from '../state/rpcActivityStore'
 import {
+  setRpcActiveTab,
+  subscribeToRpcCallTracker,
+  withRpcCallSource,
+} from '../state/rpcCallTracker'
+import {
   clearSimulationDiagnostics,
   getDebugState,
+  isDebugPanelVisible,
   setLastError,
   setLastLockPdas,
   setLastSimulationDiagnostics,
@@ -34,8 +42,10 @@ import {
 } from '../state/debugStore'
 import { copyTextToClipboard } from '../utils/copyText'
 import { getProgramStatus, refreshProgramStatus, subscribeToProgramStatus } from '../state/programStore'
-import type { CreateLockInput, LockRecord, LockSearchField, MyLocksFilter, PreviewLock, TokenType } from '../types/lock'
+import type { CreateLockInput, LockRecord, LockSearchField, PreviewLock, TokenType } from '../types/lock'
 import { readCreateLockFormState } from '../utils/formValidation'
+import { formatUserFacingLockError } from '../utils/lockUiErrors'
+import { getSearchTooShortMessage, shouldRunLockSearch } from '../utils/searchQuery'
 import { showSuccessToast } from '../utils/toast'
 import { executeCreateLockWithProgress } from '../utils/createLock'
 import { executeUnlockLock } from '../utils/unlockLock'
@@ -49,25 +59,52 @@ import {
   subscribeToWalletChanges,
   subscribeToWalletConnection,
 } from '../wallet'
-import { renderClusterPanel } from '../components/clusterPanel'
+import { renderClusterAdvancedDetails, renderWalletNetworkSection } from '../components/clusterPanel'
 import { renderDebugPanel } from '../components/debugPanel'
 import { renderLockPreviewModal } from '../components/lockPreviewModal'
-import { renderMyLocksSection } from '../components/myLocksSection'
+import type { AppTabId } from '../components/mainAppCard'
+import { renderHistoryPanel, type HistoryPanelState } from '../components/historySection'
+import { renderMyLocksContent } from '../components/myLocksSection'
 import {
   enrichLocksWithMintDecimals,
-  renderLockSummaryList,
-  renderLockTable,
-  updateLockTableRow,
 } from '../components/lockTable'
-import { renderPublicLockSearch } from '../components/publicLockSearch'
-import { renderWalletPanel } from '../components/walletPanel'
+import { renderSearchResults } from '../components/publicLockSearch'
+import { renderWalletBar } from '../components/walletPanel'
 let pendingLockInput: CreateLockInput | null = null
 let pendingPreview: PreviewLock | null = null
 let createLockProgressActive = false
-let myLocksFilter: MyLocksFilter = 'all'
 let myLocksCache: LockRecord[] = []
+let walletLocksCacheKey: string | null = null
+let historyLoaded = false
+let historyCacheKey: string | null = null
+let historyLocksCache: LockRecord[] = []
+let historyVisibleCount = 20
+const HISTORY_PAGE_SIZE = 20
 let publicLocksCache: LockRecord[] = []
+let publicSearchCacheKey: string | null = null
+let searchIncludeUnlocked = false
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 let appLiveRefreshTimer: ReturnType<typeof setInterval> | null = null
+let lastKnownWalletAddress: string | null = null
+let myLocksHandlersAttached = false
+
+function getWalletCacheKey(address: string): string {
+  return `${getSelectedNetwork()}:${address}`
+}
+
+function clearWalletLockCaches(): void {
+  myLocksCache = []
+  walletLocksCacheKey = null
+  historyLoaded = false
+  historyCacheKey = null
+  historyLocksCache = []
+  historyVisibleCount = HISTORY_PAGE_SIZE
+}
+
+function clearSearchCache(): void {
+  publicLocksCache = []
+  publicSearchCacheKey = null
+}
 
 export function stopAppLiveRefresh(): void {
   if (appLiveRefreshTimer !== null) {
@@ -81,17 +118,57 @@ function refreshMyLocksDisplay(): void {
     return
   }
 
-  const results = document.querySelector<HTMLElement>('#myLocksResults')
+  const results = getMyLocksResultsHost()
   const walletState = getWalletConnectionState()
 
   if (!results) {
     return
   }
 
-  results.innerHTML = renderLockTable(
-    filterMyLocks(myLocksCache, myLocksFilter),
-    'No on-chain locks match the selected filter for your connected wallet.',
-    Date.now(),
+  if (walletState.status !== 'connected' || !walletState.address) {
+    renderMyLocksResults(results, [], false, false, null)
+    return
+  }
+
+  renderMyLocksResults(
+    results,
+    filterActiveWalletLocks(myLocksCache),
+    true,
+    false,
+    walletState.address,
+  )
+}
+
+function refreshHistoryDisplay(): void {
+  if (shouldPauseBackgroundRpcRefresh()) {
+    return
+  }
+
+  const results = getHistoryResultsHost()
+  const walletState = getWalletConnectionState()
+
+  if (!results) {
+    return
+  }
+
+  if (walletState.status !== 'connected' || !walletState.address) {
+    renderHistoryPanelState(results, { kind: 'disconnected' }, null)
+    return
+  }
+
+  if (!historyLoaded) {
+    renderHistoryPanelState(results, { kind: 'idle' }, walletState.address)
+    return
+  }
+
+  renderHistoryPanelState(
+    results,
+    {
+      kind: 'ready',
+      locks: historyLocksCache,
+      visibleCount: historyVisibleCount,
+      totalCount: historyLocksCache.length,
+    },
     walletState.address,
   )
 }
@@ -113,8 +190,14 @@ async function handleMyLockUnlock(lockAccount: string, button: HTMLButtonElement
       myLocksCache[index] = updatedLock
     }
 
-    updateLockTableRow(updatedLock, getWalletConnectionState().address)
-    showSuccessToast('Tokens unlocked successfully.')
+    refreshMyLocksDisplay()
+
+    if (historyLoaded) {
+      historyLocksCache = sortLocksNewestFirst(filterHistoryWalletLocks(myLocksCache))
+      refreshHistoryDisplay()
+    }
+
+    showSuccessToast('Tokens unlocked successfully. Tokens have been returned to your wallet.')
   } catch (error) {
     console.error('[CBS Locker] my locks unlock failure', error)
     button.disabled = false
@@ -127,7 +210,13 @@ function handleLockUnlockedFromDetail(updatedLock: LockRecord): void {
 
   if (index >= 0) {
     myLocksCache[index] = updatedLock
-    updateLockTableRow(updatedLock, getWalletConnectionState().address)
+  }
+
+  refreshMyLocksDisplay()
+
+  if (historyLoaded) {
+    historyLocksCache = sortLocksNewestFirst(filterHistoryWalletLocks(myLocksCache))
+    refreshHistoryDisplay()
   }
 }
 
@@ -142,26 +231,44 @@ function refreshPublicLocksDisplay(): void {
     return
   }
 
-  results.innerHTML = renderLockSummaryList(publicLocksCache, Date.now())
+  results.innerHTML = renderSearchResults(
+    filterSearchLocks(publicLocksCache, searchIncludeUnlocked),
+    false,
+  )
 }
 
-function startAppLiveRefresh(): void {
+function startLocalCountdownRefresh(): void {
   stopAppLiveRefresh()
   appLiveRefreshTimer = setInterval(() => {
     refreshMyLocksDisplay()
+    refreshHistoryDisplay()
     refreshPublicLocksDisplay()
   }, LIVE_REFRESH_INTERVAL_MS)
 }
 
-function refreshClusterPanel(): void {
-  const section = document.querySelector<HTMLElement>('#cluster')
+function refreshWalletNetworkSection(): void {
+  const section = document.querySelector<HTMLElement>('#wallet-network-section')
 
   if (!section) {
     return
   }
 
-  section.outerHTML = renderClusterPanel()
-  attachClusterHandlers()
+  section.innerHTML = `<p class="wallet-bar__section-label">Network</p>${renderWalletNetworkSection()}`
+}
+
+function refreshClusterAdvancedDetails(): void {
+  const section = document.querySelector<HTMLElement>('#cluster-advanced')
+
+  if (!section) {
+    return
+  }
+
+  section.outerHTML = renderClusterAdvancedDetails()
+}
+
+function refreshNetworkUi(): void {
+  refreshWalletNetworkSection()
+  refreshClusterAdvancedDetails()
   refreshCreateLockAvailability()
   refreshDebugPanel()
 }
@@ -219,116 +326,447 @@ function extractDiagnostics(error: unknown): SimulationDiagnostics | null {
   return null
 }
 
-function refreshWalletPanel(): void {
-  const walletSection = document.querySelector<HTMLElement>('#wallet')
+function setActiveAppTab(tab: AppTabId): void {
+  setRpcActiveTab(tab)
 
-  if (!walletSection) {
+  document.querySelectorAll<HTMLElement>('[data-app-tab-panel]').forEach((panel) => {
+    const isActive = panel.dataset.appTabPanel === tab
+    panel.hidden = !isActive
+    panel.classList.toggle('is-active', isActive)
+  })
+
+  document.querySelectorAll<HTMLButtonElement>('[data-app-tab]').forEach((button) => {
+    const isActive = button.dataset.appTab === tab
+    button.classList.toggle('is-active', isActive)
+    button.setAttribute('aria-selected', isActive ? 'true' : 'false')
+  })
+}
+
+let tabHandlersAttached = false
+
+function handleTabActivated(tab: AppTabId): void {
+  if (tab === 'locks') {
+    void refreshMyLocksSection({ force: false, source: 'my-locks:tab-open' })
+  }
+
+  if (tab === 'history') {
+    refreshHistoryDisplay()
+  }
+}
+
+function attachTabHandlers(): void {
+  if (tabHandlersAttached) {
     return
   }
 
-  walletSection.outerHTML = renderWalletPanel()
+  tabHandlersAttached = true
+
+  document.addEventListener('click', (event) => {
+    const target = event.target
+
+    if (!(target instanceof HTMLElement)) {
+      return
+    }
+
+    const tabButton = target.closest<HTMLButtonElement>('[data-app-tab]')
+
+    if (!tabButton) {
+      return
+    }
+
+    const tab = tabButton.dataset.appTab as AppTabId | undefined
+
+    if (!tab) {
+      return
+    }
+
+    setActiveAppTab(tab)
+    handleTabActivated(tab)
+  })
+
+  document.addEventListener('click', (event) => {
+    const target = event.target
+
+    if (!(target instanceof HTMLElement)) {
+      return
+    }
+
+    const tabLink = target.closest<HTMLElement>('[data-app-tab-link]')
+
+    if (!tabLink) {
+      return
+    }
+
+    const tab = tabLink.dataset.appTabLink as AppTabId | undefined
+
+    if (!tab) {
+      return
+    }
+
+    setActiveAppTab(tab)
+    handleTabActivated(tab)
+  })
+
+  if (window.location.hash === '#my-locks') {
+    setActiveAppTab('locks')
+    void refreshMyLocksSection({ force: false, source: 'my-locks:tab-open' })
+  }
+}
+
+function refreshWalletPanel(): void {
+  const walletBar = document.querySelector<HTMLElement>('#wallet-bar')
+
+  if (!walletBar) {
+    return
+  }
+
+  walletBar.outerHTML = renderWalletBar()
   attachWalletHandlers()
   refreshCreateLockAvailability()
   refreshDebugPanel()
-  void refreshMyLocksSection()
+  refreshMyLocksDisplay()
 }
 
 function refreshCreateLockAvailability(): void {
   const form = document.querySelector<HTMLFormElement>('#createLockForm')
   const createButton = document.querySelector<HTMLButtonElement>('#createLockBtn')
-  const previewButton = document.querySelector<HTMLButtonElement>('#previewLockBtn')
   const formState = readCreateLockFormState(form)
 
   if (createButton) {
-    createButton.disabled =
-      !formState.canCreate || !pendingPreview || createLockProgressActive
+    createButton.disabled = !formState.canCreate || createLockProgressActive
     createButton.title = createLockProgressActive
       ? 'Create lock is in progress.'
       : !formState.canCreate
-      ? formState.disableReasons.join(' ')
-      : !pendingPreview
-        ? 'Preview the lock before submitting on-chain.'
+        ? formState.disableReasons.join(' ')
         : ''
-  }
-
-  if (previewButton) {
-    previewButton.disabled = !formState.canPreview
-    previewButton.title = !formState.canPreview ? formState.disableReasons.filter((reason) => {
-      return !reason.includes('Deploy the CBS Locker Program')
-    }).join(' ') : ''
   }
 }
 
-async function refreshMyLocksSection(): Promise<void> {
-  if (shouldPauseBackgroundRpcRefresh()) {
+function getMyLocksResultsHost(): HTMLElement | null {
+  const panel = document.querySelector<HTMLElement>('[data-app-tab-panel="locks"]')
+  return panel?.querySelector<HTMLElement>('#myLocksResults') ?? document.querySelector<HTMLElement>('#myLocksResults')
+}
+
+function renderMyLocksResults(
+  host: HTMLElement,
+  locks: LockRecord[],
+  walletConnected: boolean,
+  loading: boolean,
+  connectedWallet: string | null,
+  errorMessage: string | null = null,
+): void {
+  host.innerHTML = renderMyLocksContent(
+    locks,
+    walletConnected,
+    loading,
+    connectedWallet,
+    errorMessage,
+  )
+}
+
+function getHistoryResultsHost(): HTMLElement | null {
+  const panel = document.querySelector<HTMLElement>('[data-app-tab-panel="history"]')
+  return panel?.querySelector<HTMLElement>('#historyResults') ?? document.querySelector<HTMLElement>('#historyResults')
+}
+
+function renderHistoryPanelState(
+  host: HTMLElement,
+  state: HistoryPanelState,
+  connectedWallet: string | null,
+): void {
+  host.innerHTML = renderHistoryPanel(state, connectedWallet)
+}
+
+async function ensureWalletLocksCache(
+  walletAddress: string,
+  force = false,
+  source = 'my-locks:fetch',
+): Promise<LockRecord[]> {
+  const cacheKey = getWalletCacheKey(walletAddress)
+
+  if (!force && walletLocksCacheKey === cacheKey) {
+    return myLocksCache
+  }
+
+  myLocksCache = await withRpcCallSource(source, () => fetchWalletLocksFromApi(walletAddress))
+  await enrichLocksWithMintDecimals(myLocksCache)
+  walletLocksCacheKey = cacheKey
+  return myLocksCache
+}
+
+async function refreshMyLocksSection(options?: {
+  force?: boolean
+  source?: string
+}): Promise<void> {
+  if (!options?.force && shouldPauseBackgroundRpcRefresh()) {
     return
   }
 
-  const section = document.querySelector<HTMLElement>('#my-locks')
+  const myLocksResults = getMyLocksResultsHost()
   const walletState = getWalletConnectionState()
 
-  if (!section) {
+  if (!myLocksResults) {
     return
   }
 
   if (walletState.status !== 'connected' || !walletState.address) {
-    section.outerHTML = renderMyLocksSection([], myLocksFilter, false, false)
-    attachMyLocksHandlers()
+    renderMyLocksResults(myLocksResults, [], false, false, null)
     return
   }
 
-  section.outerHTML = renderMyLocksSection([], myLocksFilter, true, true)
-  attachMyLocksHandlers()
+  renderMyLocksResults(myLocksResults, [], true, true, walletState.address)
 
   try {
-    myLocksCache = await fetchWalletLocksFromApi(walletState.address)
-    await enrichLocksWithMintDecimals(myLocksCache)
+    await ensureWalletLocksCache(
+      walletState.address,
+      options?.force ?? false,
+      options?.source ?? (options?.force ? 'my-locks:refresh' : 'my-locks:load'),
+    )
+
+    const resultsAfterFetch = getMyLocksResultsHost()
+
+    if (!resultsAfterFetch) {
+      return
+    }
+
+    renderMyLocksResults(
+      resultsAfterFetch,
+      filterActiveWalletLocks(myLocksCache),
+      true,
+      false,
+      walletState.address,
+    )
+
+    if (historyLoaded && historyCacheKey === getWalletCacheKey(walletState.address)) {
+      historyLocksCache = sortLocksNewestFirst(filterHistoryWalletLocks(myLocksCache))
+      refreshHistoryDisplay()
+    }
   } catch (error) {
     setLastError(formatLockerError(error, getSelectedClusterLabel()))
+    walletLocksCacheKey = null
     myLocksCache = []
+
+    const { message } = formatUserFacingLockError(error, getSelectedClusterLabel())
+    const resultsAfterError = getMyLocksResultsHost()
+
+    if (resultsAfterError) {
+      renderMyLocksResults(resultsAfterError, [], true, false, walletState.address, message)
+    }
   }
+}
 
-  const refreshedSection = document.querySelector<HTMLElement>('#my-locks')
+async function loadHistory(options?: { force?: boolean }): Promise<void> {
+  const historyResults = getHistoryResultsHost()
+  const walletState = getWalletConnectionState()
 
-  if (!refreshedSection) {
+  if (!historyResults) {
     return
   }
 
-  refreshedSection.outerHTML = renderMyLocksSection(
-    filterMyLocks(myLocksCache, myLocksFilter),
-    myLocksFilter,
-    true,
-    false,
+  if (walletState.status !== 'connected' || !walletState.address) {
+    renderHistoryPanelState(historyResults, { kind: 'disconnected' }, null)
+    return
+  }
+
+  renderHistoryPanelState(historyResults, { kind: 'loading' }, walletState.address)
+
+  try {
+    await ensureWalletLocksCache(
+      walletState.address,
+      options?.force ?? false,
+      options?.force ? 'history:refresh' : 'history:load',
+    )
+
+    historyLocksCache = sortLocksNewestFirst(filterHistoryWalletLocks(myLocksCache))
+    historyLoaded = true
+    historyCacheKey = getWalletCacheKey(walletState.address)
+    historyVisibleCount = HISTORY_PAGE_SIZE
+
+    const host = getHistoryResultsHost()
+
+    if (!host) {
+      return
+    }
+
+    renderHistoryPanelState(
+      host,
+      {
+        kind: 'ready',
+        locks: historyLocksCache,
+        visibleCount: historyVisibleCount,
+        totalCount: historyLocksCache.length,
+      },
+      walletState.address,
+    )
+  } catch (error) {
+    setLastError(formatLockerError(error, getSelectedClusterLabel()))
+    const { message, details } = formatUserFacingLockError(error, getSelectedClusterLabel())
+    const host = getHistoryResultsHost()
+
+    if (host) {
+      renderHistoryPanelState(host, { kind: 'error', message, details }, walletState.address)
+    }
+  }
+}
+
+function loadMoreHistory(): void {
+  const walletState = getWalletConnectionState()
+  const host = getHistoryResultsHost()
+
+  if (!host || !historyLoaded) {
+    return
+  }
+
+  historyVisibleCount += HISTORY_PAGE_SIZE
+
+  renderHistoryPanelState(
+    host,
+    {
+      kind: 'ready',
+      locks: historyLocksCache,
+      visibleCount: historyVisibleCount,
+      totalCount: historyLocksCache.length,
+    },
+    walletState.address,
   )
-  attachMyLocksHandlers()
+}
+
+async function refreshPublicSearchSection(): Promise<void> {
+  if (shouldPauseBackgroundRpcRefresh()) {
+    return
+  }
+
+  const searchInput = document.querySelector<HTMLInputElement>('#publicLockSearchInput')
+  const searchField = document.querySelector<HTMLSelectElement>('#publicLockSearchField')
+  const resultsHost = document.querySelector<HTMLElement>('#publicLockSearchResults')
+
+  if (!resultsHost) {
+    return
+  }
+
+  const query = searchInput?.value ?? ''
+  const field = (searchField?.value ?? 'all') as LockSearchField
+
+  if (!query.trim()) {
+    clearSearchCache()
+    resultsHost.innerHTML = renderSearchResults([], false)
+    return
+  }
+
+  if (!shouldRunLockSearch(query, field)) {
+    clearSearchCache()
+    resultsHost.innerHTML = renderSearchResults([], false, {
+      hintMessage: getSearchTooShortMessage(),
+    })
+    return
+  }
+
+  const cacheKey = `${getSelectedNetwork()}:${field}:${query.trim()}`
+
+  if (publicSearchCacheKey === cacheKey) {
+    resultsHost.innerHTML = renderSearchResults(
+      filterSearchLocks(publicLocksCache, searchIncludeUnlocked),
+      false,
+    )
+    return
+  }
+
+  resultsHost.innerHTML = renderSearchResults([], true)
+
+  try {
+    const locks = await withRpcCallSource('search:query', () => searchLocksFromApi(query, field))
+    publicLocksCache = locks
+    publicSearchCacheKey = cacheKey
+    await enrichLocksWithMintDecimals(locks)
+
+    resultsHost.innerHTML = renderSearchResults(
+      filterSearchLocks(locks, searchIncludeUnlocked),
+      false,
+    )
+  } catch (error) {
+    setLastError(formatLockerError(error, getSelectedClusterLabel()))
+    clearSearchCache()
+
+    const { message, details } = formatUserFacingLockError(error, getSelectedClusterLabel())
+    resultsHost.innerHTML = renderSearchResults([], false, {
+      errorMessage: message,
+      errorDetails: details,
+    })
+  }
+}
+
+function schedulePublicSearch(): void {
+  if (searchDebounceTimer !== null) {
+    clearTimeout(searchDebounceTimer)
+  }
+
+  searchDebounceTimer = setTimeout(() => {
+    searchDebounceTimer = null
+    void refreshPublicSearchSection()
+  }, 500)
+}
+
+let clusterHandlersAttached = false
+
+function handleNetworkSwitch(network: SolanaNetwork): void {
+  setSelectedNetwork(network)
+  resetRpcCache()
+  logRpcConfiguration(network)
+  pendingPreview = null
+  pendingLockInput = null
+  clearWalletLockCaches()
+  clearSearchCache()
+
+  void refreshProgramStatus(network).then(() => {
+    refreshNetworkUi()
+    refreshMyLocksDisplay()
+    refreshHistoryDisplay()
+
+    const searchInput = document.querySelector<HTMLInputElement>('#publicLockSearchInput')
+    const searchField = document.querySelector<HTMLSelectElement>('#publicLockSearchField')
+    const query = searchInput?.value ?? ''
+    const field = (searchField?.value ?? 'all') as LockSearchField
+
+    if (query.trim() && shouldRunLockSearch(query, field)) {
+      void refreshPublicSearchSection()
+    } else {
+      refreshPublicLocksDisplay()
+    }
+  })
 }
 
 function attachClusterHandlers(): void {
-  const clusterSelect = document.querySelector<HTMLSelectElement>('#clusterSelect')
-  const refreshButton = document.querySelector<HTMLButtonElement>('#refreshProgramStatusBtn')
+  if (clusterHandlersAttached) {
+    return
+  }
 
-  clusterSelect?.addEventListener('change', () => {
-    const value = clusterSelect.value
+  clusterHandlersAttached = true
+
+  document.addEventListener('change', (event) => {
+    const target = event.target
+
+    if (!(target instanceof HTMLSelectElement) || target.id !== 'clusterSelect') {
+      return
+    }
+
+    const value = target.value
 
     if (value !== 'devnet' && value !== 'mainnet') {
       return
     }
 
-    setSelectedNetwork(value)
-    resetRpcCache()
-    logRpcConfiguration(value)
-    pendingPreview = null
-    pendingLockInput = null
-    void refreshProgramStatus(value).then(() => {
-      refreshClusterPanel()
-      refreshCreateLockAvailability()
-    })
+    handleNetworkSwitch(value)
   })
 
-  refreshButton?.addEventListener('click', () => {
+  document.addEventListener('click', (event) => {
+    const target = event.target
+
+    if (!(target instanceof HTMLButtonElement) || target.id !== 'refreshProgramStatusBtn') {
+      return
+    }
+
     void refreshProgramStatus(getSelectedNetwork()).then(() => {
-      refreshClusterPanel()
-      refreshCreateLockAvailability()
+      refreshNetworkUi()
     })
   })
 }
@@ -354,8 +792,11 @@ function attachWalletHandlers(): void {
     await disconnectWallet()
     pendingPreview = null
     pendingLockInput = null
+    clearWalletLockCaches()
+    clearSearchCache()
     refreshWalletPanel()
     refreshDebugPanel()
+    refreshHistoryDisplay()
   })
 }
 
@@ -375,7 +816,7 @@ function readCreateLockInput(form: HTMLFormElement): CreateLockInput {
   }
 }
 
-function showCreateLockSuccess(message: string): void {
+function showCreateLockSuccess(): void {
   const successElement = document.querySelector<HTMLElement>('#createLockSuccess')
   const errorElement = document.querySelector<HTMLElement>('#createLockError')
 
@@ -384,11 +825,12 @@ function showCreateLockSuccess(message: string): void {
     errorElement.hidden = true
   }
 
+  document.querySelector('#createLockSimulationDebug')?.remove()
+
   if (!successElement) {
     return
   }
 
-  successElement.textContent = message
   successElement.hidden = false
 }
 
@@ -396,7 +838,6 @@ function showCreateLockError(message: string, diagnostics: SimulationDiagnostics
   const successElement = document.querySelector<HTMLElement>('#createLockSuccess')
 
   if (successElement) {
-    successElement.textContent = ''
     successElement.hidden = true
   }
 
@@ -432,7 +873,6 @@ function clearCreateLockError(): void {
   const successElement = document.querySelector<HTMLElement>('#createLockSuccess')
 
   if (successElement) {
-    successElement.textContent = ''
     successElement.hidden = true
   }
 
@@ -514,7 +954,8 @@ function openLockPreviewModal(preview: PreviewLock): void {
       setLastError(null)
       clearSimulationDiagnostics()
       refreshDebugPanel()
-      await refreshMyLocksSection()
+      showCreateLockSuccess()
+      await refreshMyLocksSection({ force: true, source: 'my-locks:create-success' })
     } catch (error) {
       const diagnostics = extractDiagnostics(error)
       const message =
@@ -526,7 +967,7 @@ function openLockPreviewModal(preview: PreviewLock): void {
     } finally {
       createLockProgressActive = false
       setLockCreationInProgress(false)
-      startAppLiveRefresh()
+      startLocalCountdownRefresh()
       refreshCreateLockAvailability()
     }
   })
@@ -534,7 +975,6 @@ function openLockPreviewModal(preview: PreviewLock): void {
 
 function attachCreateLockHandlers(): void {
   const form = document.querySelector<HTMLFormElement>('#createLockForm')
-  const createButton = document.querySelector<HTMLButtonElement>('#createLockBtn')
 
   const handleFormChange = () => {
     clearCreateLockError()
@@ -556,7 +996,7 @@ function attachCreateLockHandlers(): void {
 
     const formState = readCreateLockFormState(form)
 
-    if (!formState.canPreview) {
+    if (!formState.canCreate) {
       showCreateLockError(formState.disableReasons.join(' '))
       return
     }
@@ -565,168 +1005,135 @@ function attachCreateLockHandlers(): void {
       pendingLockInput = readCreateLockInput(form)
       pendingPreview = buildLockPreview(pendingLockInput)
       openLockPreviewModal(pendingPreview)
-      refreshCreateLockAvailability()
     } catch (error) {
       pendingPreview = null
       pendingLockInput = null
       const message =
         error instanceof LockerValidationError
           ? error.message
-          : 'Unable to prepare lock preview.'
+          : 'Unable to prepare lock details.'
 
       showCreateLockError(message)
       refreshCreateLockAvailability()
     }
   })
-
-  createButton?.addEventListener('click', () => {
-    const formState = readCreateLockFormState(form)
-
-    if (!formState.canCreate) {
-      showCreateLockError(formState.disableReasons.join(' '))
-      return
-    }
-
-    if (!pendingPreview || !pendingLockInput) {
-      showCreateLockError('Preview the lock before creating an on-chain lock.')
-      return
-    }
-
-    openLockPreviewModal(pendingPreview)
-  })
 }
 
 function attachMyLocksHandlers(): void {
-  const searchInput = document.querySelector<HTMLInputElement>('#myLocksSearch')
-  const results = document.querySelector<HTMLElement>('#myLocksResults')
-
-  if (results && !results.dataset.unlockHandlersAttached) {
-    results.dataset.unlockHandlersAttached = 'true'
-    results.addEventListener('click', (event) => {
-      const target = event.target
-
-      if (!(target instanceof HTMLElement)) {
-        return
-      }
-
-      const unlockButton = target.closest<HTMLButtonElement>('[data-unlock-lock]')
-
-      if (!unlockButton || unlockButton.disabled) {
-        return
-      }
-
-      const lockAccount = unlockButton.dataset.unlockLock
-
-      if (!lockAccount) {
-        return
-      }
-
-      void handleMyLockUnlock(lockAccount, unlockButton)
-    })
+  if (myLocksHandlersAttached) {
+    return
   }
 
-  const renderResults = (query = '') => {
-    if (!results) {
+  myLocksHandlersAttached = true
+
+  document.addEventListener('click', (event) => {
+    const target = event.target
+
+    if (!(target instanceof HTMLElement)) {
       return
     }
 
-    const normalizedQuery = query.trim().toLowerCase()
-    const filteredByStatus = filterMyLocks(myLocksCache, myLocksFilter)
+    if (target.closest('[data-refresh-my-locks]')) {
+      void refreshMyLocksSection({ force: true, source: 'my-locks:manual-refresh' })
+      return
+    }
 
-    const filteredLocks = normalizedQuery
-      ? filteredByStatus.filter((lock) => {
-          return (
-            lock.projectName.toLowerCase().includes(normalizedQuery) ||
-            lock.lockAccount.toLowerCase().includes(normalizedQuery)
-          )
-        })
-      : filteredByStatus
+    const unlockButton = target.closest<HTMLButtonElement>('[data-unlock-lock]')
 
-    results.innerHTML = renderLockTable(
-      filteredLocks,
-      'No on-chain locks match the selected filter for your connected wallet.',
-      Date.now(),
-      getWalletConnectionState().address,
-    )
+    if (!unlockButton || unlockButton.disabled) {
+      return
+    }
+
+    const lockAccount = unlockButton.dataset.unlockLock
+
+    if (!lockAccount) {
+      return
+    }
+
+    void handleMyLockUnlock(lockAccount, unlockButton)
+  })
+}
+
+let historyHandlersAttached = false
+let searchHandlersAttached = false
+
+function attachHistoryHandlers(): void {
+  if (historyHandlersAttached) {
+    return
   }
 
-  searchInput?.addEventListener('input', () => {
-    renderResults(searchInput.value)
-  })
+  historyHandlersAttached = true
 
-  document.querySelectorAll<HTMLButtonElement>('[data-my-locks-filter]').forEach((button) => {
-    button.addEventListener('click', () => {
-      myLocksFilter = button.dataset.myLocksFilter as MyLocksFilter
-      void refreshMyLocksSection()
-    })
-  })
+  document.addEventListener('click', (event) => {
+    const target = event.target
 
-  renderResults(searchInput?.value ?? '')
+    if (!(target instanceof HTMLElement)) {
+      return
+    }
+
+    if (target.closest('[data-load-history]')) {
+      void loadHistory()
+      return
+    }
+
+    if (target.closest('[data-refresh-history]')) {
+      void loadHistory({ force: true })
+      return
+    }
+
+    if (target.closest('[data-load-more-history]')) {
+      loadMoreHistory()
+    }
+  })
+}
+
+function syncSearchRoute(): void {
+  const searchInput = document.querySelector<HTMLInputElement>('#publicLockSearchInput')
+  const searchField = document.querySelector<HTMLSelectElement>('#publicLockSearchField')
+  const query = searchInput?.value ?? ''
+  const field = (searchField?.value ?? 'all') as LockSearchField
+  const nextPath = getPublicLocksPath(query, field)
+
+  if (window.location.pathname.startsWith('/locks')) {
+    navigate(nextPath)
+  }
 }
 
 function attachPublicSearchHandlers(): void {
-  const searchInput = document.querySelector<HTMLInputElement>('#publicLockSearchInput')
-  const searchField = document.querySelector<HTMLSelectElement>('#publicLockSearchField')
-  const resultsHost = document.querySelector<HTMLElement>('#public-locks')
+  if (searchHandlersAttached) {
+    return
+  }
 
-  const renderResults = async () => {
-    if (!resultsHost) {
+  searchHandlersAttached = true
+
+  document.addEventListener('input', (event) => {
+    const target = event.target
+
+    if (!(target instanceof HTMLInputElement) || target.id !== 'publicLockSearchInput') {
       return
     }
 
-    const query = searchInput?.value ?? ''
-    const field = (searchField?.value ?? 'all') as LockSearchField
-
-    resultsHost.innerHTML = renderPublicLockSearch([], query, field, true)
-
-    try {
-      const locks = query ? await searchLocksFromApi(query, field) : []
-      publicLocksCache = locks
-      await enrichLocksWithMintDecimals(locks)
-      resultsHost.innerHTML = renderPublicLockSearch(locks, query, field, false)
-    } catch (error) {
-      setLastError(formatLockerError(error, getSelectedClusterLabel()))
-      resultsHost.innerHTML = renderPublicLockSearch([], query, field, false)
-    }
-
-    attachPublicSearchHandlers()
-  }
-
-  const syncRoute = () => {
-    const query = searchInput?.value ?? ''
-    const field = (searchField?.value ?? 'all') as LockSearchField
-    const nextPath = getPublicLocksPath(query, field)
-
-    if (window.location.pathname.startsWith('/locks')) {
-      navigate(nextPath)
-    }
-  }
-
-  searchInput?.addEventListener('input', () => {
-    void renderResults()
-    syncRoute()
+    syncSearchRoute()
+    schedulePublicSearch()
   })
 
-  searchField?.addEventListener('change', () => {
-    void renderResults()
-    syncRoute()
-  })
-}
+  document.addEventListener('change', (event) => {
+    const target = event.target
 
-function attachScrollTargets(): void {
-  document.querySelectorAll<HTMLElement>('[data-scroll-target]').forEach((element) => {
-    element.addEventListener('click', () => {
-      const targetSelector = element.dataset.scrollTarget
+    if (target instanceof HTMLSelectElement && target.id === 'publicLockSearchField') {
+      clearSearchCache()
+      syncSearchRoute()
+      schedulePublicSearch()
+      return
+    }
 
-      if (!targetSelector) {
-        return
-      }
-
-      document.querySelector(targetSelector)?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
-    })
+    if (
+      target instanceof HTMLInputElement &&
+      target.matches('[data-search-include-unlocked]')
+    ) {
+      searchIncludeUnlocked = target.checked
+      refreshPublicLocksDisplay()
+    }
   })
 }
 
@@ -734,15 +1141,32 @@ export function attachAppHandlers(): void {
   attachClusterHandlers()
   attachWalletHandlers()
   attachCreateLockHandlers()
+  attachTabHandlers()
+  attachHistoryHandlers()
   attachMyLocksHandlers()
-  startAppLiveRefresh()
+  startLocalCountdownRefresh()
   attachPublicSearchHandlers()
-  attachScrollTargets()
   refreshCreateLockAvailability()
 
+  const walletState = getWalletConnectionState()
+  lastKnownWalletAddress = walletState.address
+
   subscribeToWalletConnection(() => {
+    const nextWalletState = getWalletConnectionState()
+    const nextAddress = nextWalletState.address
+
+    if (nextAddress !== lastKnownWalletAddress) {
+      clearWalletLockCaches()
+      lastKnownWalletAddress = nextAddress
+    }
+
     refreshCreateLockAvailability()
     refreshDebugPanel()
+    refreshMyLocksDisplay()
+
+    if (historyLoaded) {
+      refreshHistoryDisplay()
+    }
   })
 
   subscribeToWalletChanges(() => {
@@ -752,43 +1176,41 @@ export function attachAppHandlers(): void {
   })
 
   subscribeToProgramStatus(() => {
-    refreshClusterPanel()
+    refreshWalletNetworkSection()
     refreshCreateLockAvailability()
     refreshDebugPanel()
   })
 
   subscribeToLockUnlocked(handleLockUnlockedFromDetail)
 
-  subscribeToClusterChanges((network: SolanaNetwork) => {
-    void refreshProgramStatus(network)
-  })
-
   subscribeToDebugState(() => {
     refreshDebugPanel()
   })
+
+  if (isDebugPanelVisible()) {
+    subscribeToRpcCallTracker(() => {
+      refreshDebugPanel()
+    })
+  }
+
+  refreshHistoryDisplay()
 }
 
 export async function loadPublicLocksPage(query = '', field: LockSearchField = 'all'): Promise<void> {
-  const host = document.querySelector<HTMLElement>('#public-locks')
+  const searchInput = document.querySelector<HTMLInputElement>('#publicLockSearchInput')
+  const searchField = document.querySelector<HTMLSelectElement>('#publicLockSearchField')
 
-  if (!host) {
-    return
+  if (searchInput) {
+    searchInput.value = query
   }
 
-  host.outerHTML = renderPublicLockSearch([], query, field, true)
-
-  try {
-    const locks = query ? await searchLocksFromApi(query, field) : []
-    publicLocksCache = locks
-    await enrichLocksWithMintDecimals(locks)
-    const replacement = document.querySelector<HTMLElement>('#public-locks')
-
-    if (replacement) {
-      replacement.outerHTML = renderPublicLockSearch(locks, query, field, false)
-    }
-  } catch (error) {
-    setLastError(formatLockerError(error, getSelectedClusterLabel()))
+  if (searchField) {
+    searchField.value = field
   }
 
-  attachPublicSearchHandlers()
+  clearSearchCache()
+
+  if (query.trim() && shouldRunLockSearch(query, field)) {
+    await refreshPublicSearchSection()
+  }
 }

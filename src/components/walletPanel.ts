@@ -1,141 +1,89 @@
 import {
   detectAvailableWallets,
   getWalletConnectionState,
-  type WalletConnectionState,
 } from '../wallet'
 import { escapeHtml } from '../utils/html'
 import { formatWalletAddress } from '../utils/format'
+import { renderWalletNetworkSection } from './clusterPanel'
 
-function renderWalletStatus(state: WalletConnectionState): string {
-  if (state.status === 'connected' && state.address) {
-    return `
-      <div class="wallet-status wallet-status--connected">
-        <span class="wallet-status__dot" aria-hidden="true"></span>
-        Connected
-      </div>
-    `
-  }
-
-  if (state.status === 'connecting') {
-    return `
-      <div class="wallet-status wallet-status--connecting">
-        <span class="wallet-status__dot" aria-hidden="true"></span>
-        Connecting…
-      </div>
-    `
-  }
-
-  if (state.status === 'error') {
-    return `
-      <div class="wallet-status wallet-status--error">
-        <span class="wallet-status__dot" aria-hidden="true"></span>
-        Connection failed
-      </div>
-    `
-  }
-
-  return `
-    <div class="wallet-status wallet-status--disconnected">
-      <span class="wallet-status__dot" aria-hidden="true"></span>
-      Not connected
-    </div>
-  `
-}
-
-export function renderWalletPanel(): string {
+export function renderWalletBar(): string {
   const wallets = detectAvailableWallets()
   const state = getWalletConnectionState()
 
   const walletOptions = wallets
     .map((wallet) => {
       const selected = wallet.id === state.walletId ? ' selected' : ''
-
       return `<option value="${escapeHtml(wallet.id)}"${selected}>${escapeHtml(wallet.name)}</option>`
     })
     .join('')
 
-  const connectedDetails =
+  const connectedAddress =
     state.status === 'connected' && state.address
       ? `
-        <div class="wallet-details">
-          <div class="wallet-detail">
-            <span class="field-label">Wallet Address</span>
-            <span class="wallet-address" title="${escapeHtml(state.address)}">
-              ${escapeHtml(formatWalletAddress(state.address, 6))}
-            </span>
-          </div>
-          <div class="wallet-detail">
-            <span class="field-label">Provider</span>
-            <span>${escapeHtml(state.walletName ?? 'Unknown')}</span>
-          </div>
-        </div>
+        <p class="wallet-bar__connected-label">Connected</p>
+        <p class="wallet-bar__address mono" title="${escapeHtml(state.address)}">${escapeHtml(formatWalletAddress(state.address, 4))}</p>
+      `
+      : ''
+
+  const disconnectButton =
+    state.status === 'connected'
+      ? `
+        <button
+          type="button"
+          class="secondary-btn wallet-bar__disconnect"
+          id="disconnectWalletBtn"
+        >
+          Disconnect
+        </button>
       `
       : ''
 
   const errorMessage = state.errorMessage
-    ? `<p class="form-error" role="alert">${escapeHtml(state.errorMessage)}</p>`
+    ? `<p class="form-error wallet-bar__error" role="alert">${escapeHtml(state.errorMessage)}</p>`
     : ''
 
-  const noWalletsMessage =
-    wallets.length === 0
-      ? `
-        <p class="wallet-empty-message">
-          No Solana wallets detected. Install a compatible wallet extension or
-          open this page in a wallet browser.
-        </p>
-      `
-      : ''
-
   return `
-    <section
-      class="page-section wallet-panel"
-      id="wallet"
-      aria-labelledby="wallet-heading"
-    >
-      <h2 class="section-title" id="wallet-heading">Wallet Connection</h2>
-      <div class="panel-card">
-        <p class="panel-lead">
-          Connect any compatible Solana wallet through the Wallet Standard.
-          CBS Token Locker supports Phantom, Solflare, Backpack, Glow, Exodus,
-          Trust Wallet, and future Solana wallets.
-        </p>
-
-        ${renderWalletStatus(state)}
-
-        <label class="field">
-          <span class="field-label">Select Wallet</span>
+    <div class="wallet-bar" id="wallet-bar">
+      <div class="wallet-bar__controls">
+        <div class="wallet-bar__section">
+          <p class="wallet-bar__section-label">Wallet</p>
           <select
-            class="field-input field-select"
+            class="wallet-bar__select"
             id="walletSelect"
+            aria-label="Select wallet"
             ${wallets.length === 0 ? 'disabled' : ''}
           >
-            ${walletOptions || '<option value="">No wallets detected</option>'}
+            ${walletOptions || '<option value="">No wallet</option>'}
           </select>
-        </label>
-
-        <div class="wallet-actions">
-          <button
-            type="button"
-            class="primary-btn"
-            id="connectWalletBtn"
-            ${wallets.length === 0 ? 'disabled' : ''}
-          >
-            Connect Wallet
-          </button>
-          <button
-            type="button"
-            class="secondary-btn"
-            id="disconnectWalletBtn"
-            ${state.status === 'connected' ? '' : 'disabled'}
-          >
-            Disconnect
-          </button>
         </div>
 
-        ${connectedDetails}
-        ${errorMessage}
-        ${noWalletsMessage}
+        <div class="wallet-bar__section wallet-bar__section--network" id="wallet-network-section">
+          <p class="wallet-bar__section-label">Network</p>
+          ${renderWalletNetworkSection()}
+        </div>
       </div>
+
+      <button
+        type="button"
+        class="primary-btn wallet-bar__connect"
+        id="connectWalletBtn"
+        ${wallets.length === 0 ? 'disabled' : ''}
+      >
+        Connect
+      </button>
+
+      ${connectedAddress}
+      ${disconnectButton}
+      ${errorMessage}
+    </div>
+  `
+}
+
+/** @deprecated Use renderWalletBar */
+export function renderWalletPanel(): string {
+  return `
+    <section class="page-section wallet-panel" id="wallet">
+      ${renderWalletBar()}
     </section>
   `
 }

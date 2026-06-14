@@ -37,12 +37,13 @@ export function renderUnlockProgressModal(): string {
     modalId: 'unlockProgressModal',
     dataAttr: 'data-unlock-progress-modal',
     headingId: 'unlock-progress-heading',
-    title: 'Unlocking Tokens',
+    title: 'Unlocking',
     leadId: 'unlockProgressLead',
-    lead: 'Keep this window open while your unlock transaction is prepared and confirmed.',
+    lead: 'Approve in your wallet when prompted.',
     stepsHtml: steps,
     successId: 'unlockProgressSuccess',
-    successMessage: 'Tokens unlocked successfully.',
+    successMessage:
+      'Tokens unlocked successfully. Tokens have been returned to your wallet.',
     errorId: 'unlockProgressError',
     debugBlockId: 'unlockProgressDebug',
     debugTextId: 'unlockProgressDebugText',
@@ -64,8 +65,8 @@ export function createUnlockProgressController(modalRoot: HTMLElement): UnlockPr
     modalRoot,
     MODAL_SELECTORS,
     {
-      heading: 'Unlock Failed',
-      lead: 'The unlock did not complete. Review the error below and try again.',
+      heading: 'Unlock failed',
+      lead: 'Something went wrong. Try again.',
     },
   )
 
@@ -73,8 +74,8 @@ export function createUnlockProgressController(modalRoot: HTMLElement): UnlockPr
     setStepState: baseController.setStepState,
     showSuccess: () => {
       baseController.showSuccess({
-        heading: 'Unlock Complete',
-        lead: 'Your tokens were returned to your wallet after on-chain verification.',
+        heading: 'Tokens unlocked successfully',
+        lead: 'Tokens have been returned to your wallet.',
       })
     },
     showFailure: (message, debugOutput) => {

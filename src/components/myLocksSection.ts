@@ -1,77 +1,55 @@
-import type { LockRecord, MyLocksFilter } from '../types/lock'
+import type { LockRecord } from '../types/lock'
+import { escapeHtml } from '../utils/html'
 import { renderLockTable } from './lockTable'
 
-function renderFilterButton(
-  filter: MyLocksFilter,
-  label: string,
-  activeFilter: MyLocksFilter,
-): string {
-  const activeClass = filter === activeFilter ? ' is-active' : ''
-
-  return `
-    <button
-      type="button"
-      class="filter-chip${activeClass}"
-      data-my-locks-filter="${filter}"
-    >
-      ${label}
-    </button>
-  `
-}
-
-export function renderMyLocksSection(
+export function renderMyLocksContent(
   locks: LockRecord[],
-  activeFilter: MyLocksFilter = 'all',
   walletConnected = false,
   loading = false,
+  connectedWallet: string | null = null,
+  errorMessage: string | null = null,
 ): string {
-  const content = loading
-    ? `<p class="empty-state">Loading on-chain locks from Solana…</p>`
-    : walletConnected
-      ? renderLockTable(
-          locks,
-          'No on-chain locks match the selected filter for your connected wallet.',
-        )
-      : `
-        <p class="empty-state">
-          Connect your wallet to load on-chain locks for your address.
-        </p>
-      `
+  if (loading) {
+    return `<p class="empty-state my-locks-state">Loading your locks...</p>`
+  }
 
+  if (!walletConnected) {
+    return `
+      <div class="empty-state-panel my-locks-state">
+        <p class="empty-state__body">Connect your wallet to view your locks.</p>
+      </div>
+    `
+  }
+
+  if (errorMessage) {
+    return `
+      <div class="empty-state-panel my-locks-state">
+        <p class="empty-state__body">${escapeHtml(errorMessage)}</p>
+      </div>
+    `
+  }
+
+  return renderLockTable(
+    locks,
+    'No active locks found.',
+    Date.now(),
+    connectedWallet,
+    { emptyTitle: '', singleLineEmpty: true },
+  )
+}
+
+/** Standalone section wrapper for /locks route compatibility */
+export function renderMyLocksSection(
+  locks: LockRecord[],
+  _activeFilter = 'all',
+  walletConnected = false,
+  loading = false,
+  connectedWallet: string | null = null,
+): string {
   return `
-    <section
-      class="page-section"
-      id="my-locks"
-      aria-labelledby="my-locks-heading"
-    >
-      <h2 class="section-title" id="my-locks-heading">My Locks</h2>
-      <div class="panel-card">
-        <p class="panel-lead">
-          On-chain locks are loaded directly from Solana for your connected wallet.
-          No browser storage is used as proof.
-        </p>
-
-        <label class="field">
-          <span class="field-label">Search My Locks</span>
-          <input
-            class="field-input"
-            type="search"
-            id="myLocksSearch"
-            placeholder="Search by project name or lock account"
-            ${walletConnected ? '' : 'disabled'}
-          />
-        </label>
-
-        <div class="filter-chip-row" role="group" aria-label="Lock filters">
-          ${renderFilterButton('all', 'All', activeFilter)}
-          ${renderFilterButton('active', 'Active Locks', activeFilter)}
-          ${renderFilterButton('expired', 'Expired Locks', activeFilter)}
-          ${renderFilterButton('upcoming', 'Upcoming Unlocks', activeFilter)}
-        </div>
-
-        <div id="myLocksResults">
-          ${content}
-        </div>
+    <section class="page-section" id="my-locks">
+      <div id="myLocksResults" class="my-locks-results" aria-live="polite">
+        ${renderMyLocksContent(locks, walletConnected, loading, connectedWallet)}
       </div>
     </section>
   `

@@ -1,6 +1,8 @@
 import { address } from '@solana/kit'
 import { fetchMaybeMint } from '@solana-program/token'
 
+import { withRpcCallSource } from '../state/rpcCallTracker'
+
 import { getSolanaRpc } from './rpc'
 
 const decimalsCache = new Map<string, number>()
@@ -14,14 +16,16 @@ export function getCachedMintDecimals(mintAddress: string): number | null {
 }
 
 async function fetchMintDecimalsOnce(normalizedMint: string): Promise<number | null> {
-  const rpc = getSolanaRpc()
-  const mintAccount = await fetchMaybeMint(rpc, address(normalizedMint))
+  return withRpcCallSource('mint-decimals:fetch', async () => {
+    const rpc = getSolanaRpc()
+    const mintAccount = await fetchMaybeMint(rpc, address(normalizedMint))
 
-  if (!mintAccount.exists) {
-    return null
-  }
+    if (!mintAccount.exists) {
+      return null
+    }
 
-  return mintAccount.data.decimals
+    return mintAccount.data.decimals
+  })
 }
 
 export async function fetchMintDecimals(mintAddress: string): Promise<number | null> {

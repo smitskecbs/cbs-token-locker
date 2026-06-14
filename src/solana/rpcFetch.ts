@@ -1,5 +1,7 @@
 import { isSolanaError } from '@solana/kit'
 
+import { getRpcCallSource, getRpcActiveTab, recordRpcCall } from '../state/rpcCallTracker'
+
 export const RPC_MIN_INTERVAL_MS = 200
 export const RPC_MAX_RETRIES = 4
 export const RPC_RETRY_BASE_MS = 1_000
@@ -60,12 +62,27 @@ function isRateLimitedResponse(response: Response): boolean {
   return response.status === 429
 }
 
+function readRpcMethod(init?: RequestInit): string {
+  if (!init?.body) {
+    return 'fetch'
+  }
+
+  try {
+    const body = JSON.parse(String(init.body)) as { method?: string }
+    return body.method ?? 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
 export function createThrottledRpcFetch(): typeof fetch {
   return async (input, init) => {
     let lastResponse: Response | null = null
 
     for (let attempt = 0; attempt <= RPC_MAX_RETRIES; attempt += 1) {
       await waitForRpcSlot()
+
+      recordRpcCall(readRpcMethod(init), getRpcCallSource(), getRpcActiveTab())
 
       const response = await fetch(input, init)
       lastResponse = response

@@ -1,6 +1,7 @@
-import { getDebugState, isDevelopmentMode } from '../state/debugStore'
+import { getDebugState, isDebugPanelVisible } from '../state/debugStore'
 
 import { getProgramStatus } from '../state/programStore'
+import { getRpcCallStats } from '../state/rpcCallTracker'
 
 import {
   getSelectedClusterLabel,
@@ -21,18 +22,35 @@ import { formatWalletAddress } from '../utils/format'
 import { formatSimulationErrorSummary, renderSimulationDebugBlock } from './simulationDebug'
 
 export function renderDebugPanel(): string {
-  if (!isDevelopmentMode()) {
+  if (!isDebugPanelVisible()) {
     return ''
   }
 
   const debug = getDebugState()
   const programStatus = getProgramStatus()
+  const rpcStats = getRpcCallStats()
   const walletState = getWalletConnectionState()
   const walletAddress = walletState.address ?? 'Not connected'
   const rpcConfig = getSelectedRpcConfiguration()
   const diagnostics = debug.lastSimulationDiagnostics
 
 
+
+  const topCallersBlock =
+    rpcStats.topCallers.length === 0
+      ? '<dd>None</dd>'
+      : `
+        <dd>
+          <ol class="rpc-caller-list">
+            ${rpcStats.topCallers
+              .map(
+                (caller) =>
+                  `<li><span class="mono">${escapeHtml(caller.source)}</span> (${caller.count})</li>`,
+              )
+              .join('')}
+          </ol>
+        </dd>
+      `
 
   const contextBlock = diagnostics?.transactionContext
 
@@ -162,19 +180,15 @@ export function renderDebugPanel(): string {
 
   return `
 
-    <section
+    <section class="advanced-details-section debug-panel-section" id="debug-panel">
 
-      class="page-section debug-panel"
+      <details class="advanced-details debug-panel-details">
 
-      id="debug-panel"
+        <summary class="advanced-details__summary">Development Debug Panel</summary>
 
-      aria-labelledby="debug-panel-heading"
+        <div class="advanced-details__content">
 
-    >
-
-      <h2 class="section-title" id="debug-panel-heading">Development Debug Panel</h2>
-
-      <div class="panel-card debug-panel__card">
+          <div class="panel-card debug-panel__card">
 
         <dl class="debug-list">
 
@@ -231,6 +245,22 @@ export function renderDebugPanel(): string {
             <dt>Program Deployed</dt>
 
             <dd>${programStatus.loading ? 'Checking…' : !programStatus.statusKnown ? 'Unknown' : programStatus.deployed ? 'Yes' : 'No'}</dd>
+
+          </div>
+
+          <div class="debug-item">
+
+            <dt>RPC calls last 30s</dt>
+
+            <dd>${rpcStats.countLast30s}</dd>
+
+          </div>
+
+          <div class="debug-item">
+
+            <dt>Top callers</dt>
+
+            ${topCallersBlock}
 
           </div>
 
@@ -313,6 +343,10 @@ export function renderDebugPanel(): string {
         </button>
 
       </div>
+
+        </div>
+
+      </details>
 
     </section>
 

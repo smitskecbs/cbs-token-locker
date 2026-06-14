@@ -25,7 +25,7 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
   const tokenMint = String(formData?.get('tokenMint') ?? '').trim()
   const amount = String(formData?.get('amount') ?? '').trim()
   const unlockDate = String(formData?.get('unlockDate') ?? '').trim()
-  const unlockTime = String(formData?.get('unlockTime') ?? '').trim() || '00:00'
+  const unlockTime = String(formData?.get('unlockTime') ?? '').trim()
   const safetyChecked = Boolean(form?.querySelector<HTMLInputElement>('#safetyAcknowledgement')?.checked)
 
   const walletConnected = walletState.status === 'connected' && Boolean(walletState.address)
@@ -39,7 +39,7 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
 
   let unlockDateValid = false
 
-  if (unlockDate) {
+  if (unlockDate && unlockTime) {
     const unlockAt = combineUnlockDateTime(unlockDate, unlockTime)
     unlockDateValid = !Number.isNaN(new Date(unlockAt).getTime()) && new Date(unlockAt).getTime() > Date.now()
   }

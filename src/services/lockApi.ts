@@ -1,3 +1,4 @@
+import { getRpcActiveTab, getRpcCallSource, recordRpcCall } from '../state/rpcCallTracker'
 import type { LockRecord, LockSearchField } from '../types/lock'
 import { LockApiError, type LockApiErrorCode } from './lockApiError'
 
@@ -67,6 +68,7 @@ async function readApiErrorPayload(response: Response): Promise<ApiErrorPayload>
 
 async function fetchJson<T>(path: string, method = 'GET'): Promise<T> {
   const url = `${API_BASE}${path}`
+  recordRpcCall(`api.${method} ${path}`, getRpcCallSource(), getRpcActiveTab())
   const response = await fetch(url)
 
   if (!response.ok) {

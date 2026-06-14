@@ -1,7 +1,8 @@
 import type { SolanaNetwork } from '../solana/config'
-import { PROGRAM_STATUS_RATE_LIMIT_MESSAGE } from './rpcActivityStore'
 import { isRpcRateLimitError } from '../solana/rpcFetch'
 import { checkProgramDeployed, type ProgramDeploymentStatus } from '../solana/programStatus'
+import { withRpcCallSource } from './rpcCallTracker'
+import { PROGRAM_STATUS_RATE_LIMIT_MESSAGE } from './rpcActivityStore'
 
 type ProgramStatusListener = (status: ProgramDeploymentStatus) => void
 
@@ -47,7 +48,7 @@ export async function refreshProgramStatus(
   notifyListeners()
 
   try {
-    const status = await checkProgramDeployed(cluster)
+    const status = await withRpcCallSource('program-status:check', () => checkProgramDeployed(cluster))
     currentStatus = status
   } catch (error) {
     if (isRpcRateLimitError(error)) {
