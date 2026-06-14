@@ -18,13 +18,13 @@
     }
   ],
   "functions": {
-    "api/v1/program.js": {
+    "api/v1/program.ts": {
       "maxDuration": 30
     },
-    "api/v1/locks/index.js": {
+    "api/v1/locks/index.ts": {
       "maxDuration": 30
     },
-    "api/v1/locks/[lockAccount].js": {
+    "api/v1/locks/[lockAccount].ts": {
       "maxDuration": 30
     }
   }
