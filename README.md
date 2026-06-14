@@ -42,9 +42,11 @@ CBS Token Locker lets project teams lock tokens on Solana with transparent, publ
 
 `DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU` (devnet deployment)
 
+Mainnet deployment is **not active** until the program is deployed on Mainnet and verified in the app.
+
 See [docs/PROGRAM.md](docs/PROGRAM.md) for account layout, PDA seeds, and deployment notes.
 
-## Devnet testing
+## Devnet setup
 
 See [docs/DEVNET_TESTING.md](docs/DEVNET_TESTING.md) for the full local devnet testing flow and checklist.
 
@@ -61,6 +63,21 @@ npm run dev
 
 Set the cluster selector to **Devnet**, confirm the CBS Locker Program is deployed, then create and unlock locks with a funded devnet wallet.
 
+## Mainnet setup
+
+Mainnet is supported in the UI and API, but the CBS Locker Program is **not deployed on Mainnet yet**.
+
+Before using Mainnet:
+
+1. Deploy the Anchor program to Mainnet (see `docs/PROGRAM.md`).
+2. Configure Mainnet RPC credentials in `.env` (see below).
+3. Set the in-app network selector to **Mainnet**.
+4. Confirm the app reports program status for Mainnet (not Devnet).
+
+When Mainnet is selected but the program is not deployed, the app shows:
+
+> CBS Locker Program is not deployed on Mainnet yet.
+
 ## Phantom wallet support
 
 CBS Token Locker supports injected wallets (including Phantom) and Wallet Standard–compatible wallets.
@@ -73,35 +90,58 @@ Use a wallet funded on devnet for testing. Switch Phantom to Devnet before creat
 
 ## Local RPC configuration
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root (copy from `.env.example`):
 
 ```bash
-HELIUS_DEVNET_API_KEY=your_key_here
+HELIUS_DEVNET_API_KEY=PASTE_KEY_HERE
+HELIUS_MAINNET_API_KEY=PASTE_KEY_HERE
+VITE_SOLANA_RPC_DEVNET=
+VITE_SOLANA_RPC_MAINNET=
 ```
 
-Copy `.env.example` as a starting point if needed. Restart the dev server after changing env values:
+Optional overrides:
+
+- `VITE_HELIUS_DEVNET_RPC` — full Helius Devnet RPC URL
+- `VITE_HELIUS_MAINNET_RPC` — full Helius Mainnet RPC URL
+- `VITE_SOLANA_NETWORK` — default network when no cluster is stored (`devnet` or `mainnet`)
+
+Restart both the API and frontend after changing env values:
 
 ```bash
+npm run dev:api
 npm run dev
 ```
 
-RPC priority on devnet:
+### Devnet RPC priority
 
 1. `VITE_SOLANA_RPC_DEVNET` — full custom RPC URL
 2. `HELIUS_DEVNET_API_KEY` — builds `https://devnet.helius-rpc.com/?api-key=...`
 3. `VITE_HELIUS_DEVNET_RPC` — full Helius RPC URL
 4. Public devnet RPC fallback (`https://api.devnet.solana.com`)
 
+### Mainnet RPC priority
+
+1. `VITE_SOLANA_RPC_MAINNET` — full custom RPC URL
+2. `HELIUS_MAINNET_API_KEY` — builds `https://mainnet.helius-rpc.com/?api-key=...`
+3. `VITE_HELIUS_MAINNET_RPC` — full Helius RPC URL
+4. Public mainnet RPC fallback (`https://api.mainnet-beta.solana.com`)
+
 **Never commit `.env`.** Only `.env.example` is tracked in git.
 
 ## Public API
 
+All API endpoints accept a `cluster` query parameter: `cluster=devnet` or `cluster=mainnet`.
+
+- If `cluster` is omitted, the API defaults to **devnet**.
+- Invalid cluster values return HTTP 400.
+- The frontend always sends the selected network as `cluster`.
+
 | Endpoint | Description |
 |---|---|
-| `GET /api/v1/program` | Program metadata for public verification |
-| `GET /api/v1/locks/:lockAccount` | Read one on-chain lock |
-| `GET /api/v1/locks?owner=` | List locks for a wallet |
-| `GET /api/v1/locks?q=&field=` | Search on-chain locks |
+| `GET /api/v1/program?cluster=` | Program metadata for public verification |
+| `GET /api/v1/locks/:lockAccount?cluster=` | Read one on-chain lock |
+| `GET /api/v1/locks?owner=&cluster=` | List locks for a wallet |
+| `GET /api/v1/locks?q=&field=&cluster=` | Search on-chain locks |
 
 ## User flow
 

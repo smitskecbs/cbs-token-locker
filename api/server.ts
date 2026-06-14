@@ -7,6 +7,7 @@ import { assertIsAddress } from '@solana/kit'
 import {
   classifyApiError,
   getErrorMessage,
+  invalidClusterResponse,
   invalidLockAccountResponse,
   invalidSearchParamsResponse,
   type ApiErrorBody,
@@ -16,8 +17,12 @@ import {
   fetchOnChainLock,
   searchOnChainLocks,
 } from '../src/solana/client.ts'
-import { logApiRpcConfiguration } from '../src/solana/config.ts'
+import { logApiRequestCluster, logApiRpcConfiguration } from '../src/solana/config.ts'
+import type { SolanaNetwork } from '../src/solana/config.ts'
 import { CBS_LOCKER_PROGRAM_ID } from '../src/solana/programId.ts'
+import {
+  parseRequestCluster,
+} from '../src/solana/requestCluster.ts'
 import type { LockSearchField } from '../src/types/lock.ts'
 
 const PORT = Number(process.env.LOCK_API_PORT || 8787)
@@ -56,6 +61,24 @@ function readSearchField(value: string | null): LockSearchField {
   return 'all'
 }
 
+function resolveRequestCluster(
+  url: URL,
+): { cluster: SolanaNetwork } | { error: ReturnType<typeof invalidClusterResponse> } {
+  const rawCluster = url.searchParams.get('cluster')
+
+  if (rawCluster === null || rawCluster.trim() === '') {
+    return { cluster: 'devnet' }
+  }
+
+  const parsed = parseRequestCluster(rawCluster)
+
+  if (!parsed) {
+    return { error: invalidClusterResponse(`Received cluster=${rawCluster}`) }
+  }
+
+  return { cluster: parsed }
+}
+
 function assertValidAddress(value: string, invalidResponse: () => ReturnType<typeof invalidSearchParamsResponse>): void {
   try {
     assertIsAddress(value)
@@ -78,9 +101,19 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
   }
 
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+  const clusterResult = resolveRequestCluster(url)
+
+  if ('error' in clusterResult) {
+    sendApiError(response, clusterResult.error.status, clusterResult.error.body)
+    return
+  }
+
+  const cluster = clusterResult.cluster
+  logApiRequestCluster(cluster, url.pathname)
 
   if (url.pathname === '/api/v1/program') {
     sendJson(response, 200, {
+      cluster,
       programId: CBS_LOCKER_PROGRAM_ID,
       repository: REPOSITORY_URL,
       verification: 'Designed for public verification',
@@ -116,8 +149,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
     }
 
     try {
-      const lock = await fetchOnChainLock(lockAccount)
-      sendJson(response, 200, { lock })
+      const lock = await fetchOnChainLock(lockAccount, cluster)
+      sendJson(response, 200, { cluster, lock })
       return
     } catch (error) {
       const apiError = classifyApiError(error)
@@ -145,8 +178,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
       }
 
       try {
-        const locks = await fetchLocksByOwner(owner)
-        sendJson(response, 200, { locks })
+        const locks = await fetchLocksByOwner(owner, cluster)
+        sendJson(response, 200, { cluster, locks })
         return
       } catch (error) {
         const apiError = classifyApiError(error)
@@ -156,13 +189,13 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
     }
 
     if (!query) {
-      sendJson(response, 200, { locks: [] })
+      sendJson(response, 200, { cluster, locks: [] })
       return
     }
 
     try {
-      const locks = await searchOnChainLocks(query, field)
-      sendJson(response, 200, { locks })
+      const locks = await searchOnChainLocks(query, field, cluster)
+      sendJson(response, 200, { cluster, locks })
       return
     } catch (error) {
       const apiError = classifyApiError(error)
@@ -198,4 +231,5 @@ createServer((request, response) => {
   logApiRpcConfiguration()
   console.log(`CBS Token Locker API listening on http://localhost:${PORT}`)
   console.log(`Program ID: ${CBS_LOCKER_PROGRAM_ID}`)
+  console.log('API cluster param: cluster=devnet | cluster=mainnet (defaults to devnet)')
 })

@@ -3,6 +3,7 @@ export type LockApiErrorCode =
   | 'RPC_ERROR'
   | 'INVALID_SEARCH_PARAMS'
   | 'INVALID_LOCK_ACCOUNT'
+  | 'INVALID_CLUSTER'
   | 'UNKNOWN'
 
 export class LockApiError extends Error {

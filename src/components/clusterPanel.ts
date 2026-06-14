@@ -1,15 +1,10 @@
 import { getProgramStatus } from '../state/programStore'
 
 import {
-
   getSelectedClusterLabel,
-
   getSelectedNetwork,
-
   getSelectedRpcDisplayUrl,
-
   getSelectedRpcSourceLabel,
-
 } from '../solana/cluster'
 
 import { getProgramStatusDisplayMessage } from '../solana/programStatus'
@@ -21,8 +16,18 @@ import { escapeHtml } from '../utils/html'
 export function renderProgramStatusBanner(): string {
 
   const programStatus = getProgramStatus()
+  const selectedNetwork = getSelectedNetwork()
+  const clusterLabel = getSelectedClusterLabel()
 
-  const programMessage = getProgramStatusDisplayMessage(programStatus, getSelectedClusterLabel())
+  if (programStatus.cluster !== selectedNetwork) {
+    return `
+    <div class="program-status program-status--loading wallet-bar__program-status" id="programStatusBanner" role="status">
+      Checking CBS Locker Program status on ${escapeHtml(clusterLabel)}…
+    </div>
+    `
+  }
+
+  const programMessage = getProgramStatusDisplayMessage(programStatus, clusterLabel)
 
 
 

@@ -8,6 +8,7 @@ import {
 import type { LockRecord } from '../types/lock'
 import { parseTokenLockAccount } from './layout'
 import { CBS_LOCKER_PROGRAM_ID } from './programId'
+import type { SolanaNetwork } from './config'
 import { getSolanaRpc } from './rpc'
 import { verifyOnChainLock } from './verify'
 
@@ -36,7 +37,10 @@ export function toLockRecord(
   }
 }
 
-export async function fetchOnChainLock(lockAccountAddress: string): Promise<LockRecord | null> {
+export async function fetchOnChainLock(
+  lockAccountAddress: string,
+  network?: SolanaNetwork,
+): Promise<LockRecord | null> {
   try {
     assertIsAddress(lockAccountAddress)
   } catch {
@@ -44,7 +48,7 @@ export async function fetchOnChainLock(lockAccountAddress: string): Promise<Lock
   }
 
   const lockAccount = address(lockAccountAddress)
-  const rpc = getSolanaRpc()
+  const rpc = getSolanaRpc(network)
   const encodedAccount = await fetchEncodedAccount(rpc, lockAccount)
 
   if (!encodedAccount.exists || encodedAccount.programAddress !== CBS_LOCKER_PROGRAM_ID) {
@@ -57,7 +61,7 @@ export async function fetchOnChainLock(lockAccountAddress: string): Promise<Lock
     return null
   }
 
-  const verification = await verifyOnChainLock(lockAccount)
+  const verification = await verifyOnChainLock(lockAccount, network)
 
   return toLockRecord(lockAccount, parsed, verification)
 }

@@ -17,6 +17,7 @@ export type RpcConfiguration = {
 }
 
 const HELIUS_DEVNET_RPC_BASE = 'https://devnet.helius-rpc.com/'
+const HELIUS_MAINNET_RPC_BASE = 'https://mainnet.helius-rpc.com/'
 
 function readEnv(key: string): string | undefined {
   if (typeof process !== 'undefined' && process.env[key]?.trim()) {
@@ -42,6 +43,10 @@ export function getDefaultNetwork(): SolanaNetwork {
 
 export function buildHeliusDevnetRpcUrl(apiKey: string): string {
   return `${HELIUS_DEVNET_RPC_BASE}?api-key=${encodeURIComponent(apiKey)}`
+}
+
+export function buildHeliusMainnetRpcUrl(apiKey: string): string {
+  return `${HELIUS_MAINNET_RPC_BASE}?api-key=${encodeURIComponent(apiKey)}`
 }
 
 export function redactRpcUrl(url: string): string {
@@ -93,10 +98,12 @@ export function getRpcConfiguration(network: SolanaNetwork = getDefaultNetwork()
   const heliusDevnetApiKey = readEnv('HELIUS_DEVNET_API_KEY')
   const viteHeliusDevnet = readEnv('VITE_HELIUS_DEVNET_RPC')
   const viteSolanaRpcMainnet = readEnv('VITE_SOLANA_RPC_MAINNET')
+  const heliusMainnetApiKey = readEnv('HELIUS_MAINNET_API_KEY')
   const viteHeliusMainnet = readEnv('VITE_HELIUS_MAINNET_RPC')
 
   const envFlags = {
-    heliusApiKeyLoaded: Boolean(heliusDevnetApiKey),
+    heliusApiKeyLoaded:
+      network === 'devnet' ? Boolean(heliusDevnetApiKey) : Boolean(heliusMainnetApiKey),
     viteSolanaRpcDevnetLoaded: Boolean(viteSolanaRpcDevnet),
     viteHeliusDevnetRpcLoaded: Boolean(viteHeliusDevnet),
     viteSolanaRpcMainnetLoaded: Boolean(viteSolanaRpcMainnet),
@@ -153,6 +160,16 @@ export function getRpcConfiguration(network: SolanaNetwork = getDefaultNetwork()
     )
   }
 
+  if (heliusMainnetApiKey) {
+    return buildRpcConfiguration(
+      network,
+      buildHeliusMainnetRpcUrl(heliusMainnetApiKey),
+      'helius-api-key',
+      'HELIUS_MAINNET_API_KEY',
+      envFlags,
+    )
+  }
+
   if (viteHeliusMainnet) {
     return buildRpcConfiguration(
       network,
@@ -176,8 +193,26 @@ export function logRpcConfiguration(network: SolanaNetwork = getDefaultNetwork()
   logRpcConfigurationWithPrefix('[CBS Locker]', network)
 }
 
-export function logApiRpcConfiguration(network: SolanaNetwork = getDefaultNetwork()): void {
-  logRpcConfigurationWithPrefix('[CBS Locker API]', network)
+export function logApiRpcConfiguration(): void {
+  console.info('[CBS Locker API] Startup RPC configuration')
+  for (const network of ['devnet', 'mainnet'] as const) {
+    const config = getRpcConfiguration(network)
+    console.info(`[CBS Locker API] ${network}`, {
+      rpcSource: config.sourceLabel,
+      rpcUrl: config.displayUrl,
+      envVar: config.envVar,
+    })
+  }
+}
+
+export function logApiRequestCluster(cluster: SolanaNetwork, path: string): void {
+  const config = getRpcConfiguration(cluster)
+  console.info('[CBS Locker API Request]', {
+    cluster,
+    path,
+    rpcSource: config.sourceLabel,
+    rpcUrl: config.displayUrl,
+  })
 }
 
 function logRpcConfigurationWithPrefix(prefix: string, network: SolanaNetwork): void {

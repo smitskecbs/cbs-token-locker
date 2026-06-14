@@ -5,10 +5,14 @@ import type { OnChainVerification } from '../types/lock'
 import { CBS_LOCKER_PROGRAM_ID } from './programId'
 import { parseTokenLockAccount } from './layout'
 import { findLockAccountAddress, findVaultAddress } from './pda'
+import type { SolanaNetwork } from './config'
 import { getSolanaRpc } from './rpc'
 
-export async function verifyOnChainLock(lockAccount: Address): Promise<OnChainVerification> {
-  const rpc = getSolanaRpc()
+export async function verifyOnChainLock(
+  lockAccount: Address,
+  network?: SolanaNetwork,
+): Promise<OnChainVerification> {
+  const rpc = getSolanaRpc(network)
   const encodedAccount = await fetchEncodedAccount(rpc, lockAccount)
 
   if (!encodedAccount.exists) {

@@ -1,3 +1,4 @@
+import { getSelectedNetwork } from '../solana/cluster'
 import { getRpcActiveTab, getRpcCallSource, recordRpcCall } from '../state/rpcCallTracker'
 import type { LockRecord, LockSearchField } from '../types/lock'
 import { LockApiError, type LockApiErrorCode } from './lockApiError'
@@ -10,12 +11,25 @@ type ApiErrorPayload = {
   details?: string
 }
 
+function appendClusterParam(params: URLSearchParams): void {
+  params.set('cluster', getSelectedNetwork())
+}
+
+function buildApiPath(path: string, params?: URLSearchParams): string {
+  const searchParams = params ?? new URLSearchParams()
+  appendClusterParam(searchParams)
+  const query = searchParams.toString()
+
+  return query ? `${path}?${query}` : path
+}
+
 function resolveApiErrorCode(code: string | undefined, status: number): LockApiErrorCode {
   if (
     code === 'RPC_RATE_LIMIT' ||
     code === 'RPC_ERROR' ||
     code === 'INVALID_SEARCH_PARAMS' ||
-    code === 'INVALID_LOCK_ACCOUNT'
+    code === 'INVALID_LOCK_ACCOUNT' ||
+    code === 'INVALID_CLUSTER'
   ) {
     return code
   }
@@ -91,8 +105,9 @@ export { LockApiError, type LockApiErrorCode } from './lockApiError'
 
 export async function fetchLockFromApi(lockAccount: string): Promise<LockRecord | null> {
   try {
+    const params = new URLSearchParams()
     const result = await fetchJson<{ lock: LockRecord | null }>(
-      `/locks/${encodeURIComponent(lockAccount)}`,
+      buildApiPath(`/locks/${encodeURIComponent(lockAccount)}`, params),
     )
 
     return result.lock
@@ -119,24 +134,28 @@ export async function searchLocksFromApi(
     params.set('field', field)
   }
 
-  const suffix = params.toString() ? `?${params.toString()}` : ''
-
-  return fetchJson<{ locks: LockRecord[] }>(`/locks${suffix}`).then((result) => result.locks)
+  return fetchJson<{ locks: LockRecord[] }>(buildApiPath('/locks', params)).then(
+    (result) => result.locks,
+  )
 }
 
 export async function fetchWalletLocksFromApi(walletAddress: string): Promise<LockRecord[]> {
-  const result = await fetchJson<{ locks: LockRecord[] }>(
-    `/locks?owner=${encodeURIComponent(walletAddress)}`,
-  )
+  const params = new URLSearchParams()
+  params.set('owner', walletAddress)
+
+  const result = await fetchJson<{ locks: LockRecord[] }>(buildApiPath('/locks', params))
 
   return result.locks
 }
 
 export async function fetchProgramInfoFromApi(): Promise<{
+  cluster: string
   programId: string
   repository: string
   verification: string
   dexRecognition: string
 }> {
-  return fetchJson('/program')
+  const params = new URLSearchParams()
+
+  return fetchJson(buildApiPath('/program', params))
 }

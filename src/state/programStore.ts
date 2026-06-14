@@ -40,8 +40,10 @@ export async function refreshProgramStatus(
   cluster: SolanaNetwork = currentStatus.cluster,
 ): Promise<ProgramDeploymentStatus> {
   currentStatus = {
-    ...currentStatus,
     cluster,
+    deployed: false,
+    statusKnown: false,
+    checkedAt: null,
     loading: true,
     error: null,
   }

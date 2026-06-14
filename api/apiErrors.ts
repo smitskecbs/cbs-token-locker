@@ -8,6 +8,7 @@ export type ApiErrorCode =
   | 'RPC_ERROR'
   | 'INVALID_SEARCH_PARAMS'
   | 'INVALID_LOCK_ACCOUNT'
+  | 'INVALID_CLUSTER'
 
 export type ApiErrorBody = {
   error: string
@@ -96,6 +97,17 @@ export function invalidLockAccountResponse(details?: string): ApiErrorResponse {
     body: {
       error: 'Invalid lock account address.',
       code: 'INVALID_LOCK_ACCOUNT',
+      ...(details ? { details } : {}),
+    },
+  }
+}
+
+export function invalidClusterResponse(details?: string): ApiErrorResponse {
+  return {
+    status: 400,
+    body: {
+      error: 'Invalid cluster. Use cluster=devnet or cluster=mainnet.',
+      code: 'INVALID_CLUSTER',
       ...(details ? { details } : {}),
     },
   }

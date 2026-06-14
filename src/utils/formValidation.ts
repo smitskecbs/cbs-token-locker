@@ -1,4 +1,5 @@
 import { isValidSolanaAddress } from '../locker'
+import { getSelectedNetwork } from '../solana/cluster'
 import { getProgramStatus } from '../state/programStore'
 import { getWalletConnectionState } from '../wallet'
 import { combineUnlockDateTime } from './time'
@@ -18,7 +19,9 @@ export type CreateLockFormState = {
 
 export function readCreateLockFormState(form: HTMLFormElement | null): CreateLockFormState {
   const walletState = getWalletConnectionState()
+  const selectedNetwork = getSelectedNetwork()
   const programStatus = getProgramStatus()
+  const programStatusMatchesNetwork = programStatus.cluster === selectedNetwork
   const formData = form ? new FormData(form) : null
 
   const projectName = String(formData?.get('projectName') ?? '').trim()
@@ -29,9 +32,13 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
   const safetyChecked = Boolean(form?.querySelector<HTMLInputElement>('#safetyAcknowledgement')?.checked)
 
   const walletConnected = walletState.status === 'connected' && Boolean(walletState.address)
-  const programVerificationUnavailable = !programStatus.loading && !programStatus.statusKnown
+  const programVerificationUnavailable =
+    programStatusMatchesNetwork && !programStatus.loading && !programStatus.statusKnown
   const programDeployed =
-    programStatus.statusKnown && programStatus.deployed && !programStatus.loading
+    programStatusMatchesNetwork &&
+    programStatus.statusKnown &&
+    programStatus.deployed &&
+    !programStatus.loading
   const projectNameValid = projectName.length > 0
   const mintValid = isValidSolanaAddress(tokenMint)
   const numericAmount = Number(amount.replaceAll(',', ''))
@@ -52,8 +59,8 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
 
   if (programVerificationUnavailable && programStatus.error) {
     disableReasons.push(programStatus.error)
-  } else if (!programDeployed && !programStatus.loading) {
-    disableReasons.push('Deploy the CBS Locker Program on this cluster.')
+  } else if (!programDeployed && !programStatus.loading && programStatusMatchesNetwork) {
+    disableReasons.push(`Deploy the CBS Locker Program on ${selectedNetwork === 'mainnet' ? 'Mainnet' : 'Devnet'}.`)
   }
 
   if (!projectNameValid) {

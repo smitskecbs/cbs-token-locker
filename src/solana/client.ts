@@ -13,6 +13,7 @@ import { formatLockerError } from './errors'
 import { fetchOnChainLock, toLockRecord } from './fetchLock'
 import { parseTokenLockAccount } from './layout'
 import { unlockOnChainLockWithFlow, UnlockFlowError } from './unlockFlow'
+import type { SolanaNetwork } from './config'
 import { CBS_LOCKER_PROGRAM_ID } from './programId'
 import { getSolanaRpc } from './rpc'
 import type { SimulationDiagnostics } from './simulationDiagnostics'
@@ -43,10 +44,13 @@ function normalizeProgramAccountsResponse(
 
 export { fetchOnChainLock, toLockRecord } from './fetchLock'
 
-export async function fetchLocksByOwner(ownerAddress: string): Promise<LockRecord[]> {
+export async function fetchLocksByOwner(
+  ownerAddress: string,
+  network?: SolanaNetwork,
+): Promise<LockRecord[]> {
   assertIsAddress(ownerAddress)
 
-  const rpc = getSolanaRpc()
+  const rpc = getSolanaRpc(network)
   const response = await rpc
     .getProgramAccounts(CBS_LOCKER_PROGRAM_ID, {
       encoding: 'base64',
@@ -72,7 +76,7 @@ export async function fetchLocksByOwner(ownerAddress: string): Promise<LockRecor
       continue
     }
 
-    const verification = await verifyOnChainLock(address(account.pubkey))
+    const verification = await verifyOnChainLock(address(account.pubkey), network)
     locks.push(toLockRecord(address(account.pubkey), parsed, verification))
   }
 
@@ -84,6 +88,7 @@ export async function fetchLocksByOwner(ownerAddress: string): Promise<LockRecor
 export async function searchOnChainLocks(
   query: string,
   field: 'all' | 'lockId' | 'wallet' | 'mint' | 'project',
+  network?: SolanaNetwork,
 ): Promise<LockRecord[]> {
   const normalizedQuery = query.trim()
 
@@ -93,7 +98,7 @@ export async function searchOnChainLocks(
 
   if (field === 'lockId' || (field === 'all' && normalizedQuery.length >= 32)) {
     try {
-      const lock = await fetchOnChainLock(normalizedQuery)
+      const lock = await fetchOnChainLock(normalizedQuery, network)
 
       if (lock) {
         return [lock]
@@ -105,7 +110,7 @@ export async function searchOnChainLocks(
 
   if (field === 'wallet' || field === 'all') {
     try {
-      const locks = await fetchLocksByOwner(normalizedQuery)
+      const locks = await fetchLocksByOwner(normalizedQuery, network)
       if (locks.length > 0) {
         return filterLocksByQuery(locks, normalizedQuery, field)
       }
@@ -114,7 +119,7 @@ export async function searchOnChainLocks(
     }
   }
 
-  const rpc = getSolanaRpc()
+  const rpc = getSolanaRpc(network)
   const response = await rpc
     .getProgramAccounts(CBS_LOCKER_PROGRAM_ID, {
       encoding: 'base64',
@@ -148,7 +153,7 @@ export async function searchOnChainLocks(
       continue
     }
 
-    const verification = await verifyOnChainLock(lockAccount)
+    const verification = await verifyOnChainLock(lockAccount, network)
     locks.push(toLockRecord(lockAccount, parsed, verification))
   }
 
