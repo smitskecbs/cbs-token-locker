@@ -8,6 +8,3 @@ target
 .env.local
 .env.*.local
 !.env.example
-api/v1/program.js
-api/v1/locks/index.js
-api/v1/locks/[lockAccount].js
