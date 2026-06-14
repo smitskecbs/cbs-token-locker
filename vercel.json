@@ -1,0 +1,31 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/lock/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/locks",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "api/v1/program.ts": {
+      "maxDuration": 30
+    },
+    "api/v1/locks/index.ts": {
+      "maxDuration": 30
+    },
+    "api/v1/locks/[lockAccount].ts": {
+      "maxDuration": 30
+    }
+  }
+}

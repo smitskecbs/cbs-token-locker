@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   base: '/',
-  envPrefix: ['VITE_', 'HELIUS_'],
+  envPrefix: ['VITE_'],
   server: {
     proxy: {
       '/api': {

@@ -1,7 +1,3 @@
-import 'dotenv/config'
-
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-
 import { assertIsAddress } from '@solana/kit'
 
 import {
@@ -17,35 +13,39 @@ import {
   fetchOnChainLock,
   searchOnChainLocks,
 } from '../src/solana/client.ts'
-import { logApiRequestCluster, logApiRpcConfiguration } from '../src/solana/config.ts'
+import { logApiRequestCluster } from '../src/solana/config.ts'
 import type { SolanaNetwork } from '../src/solana/config.ts'
 import { CBS_LOCKER_PROGRAM_ID } from '../src/solana/programId.ts'
-import {
-  parseRequestCluster,
-} from '../src/solana/requestCluster.ts'
+import { parseRequestCluster } from '../src/solana/requestCluster.ts'
 import type { LockSearchField } from '../src/types/lock.ts'
 
-const PORT = Number(process.env.LOCK_API_PORT || 8787)
 const REPOSITORY_URL =
   process.env.CBS_LOCKER_REPOSITORY_URL ||
   'https://github.com/cbs-coin/cbs-token-locker'
 
-function sendJson(response: ServerResponse, status: number, payload: unknown): void {
-  response.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  })
-  response.end(JSON.stringify(payload))
+const CORS_HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+} as const
+
+export type ApiResponseSink = {
+  writeHead(status: number, headers: Record<string, string>): void
+  end(body: string): void
+}
+
+function sendJson(sink: ApiResponseSink, status: number, payload: unknown): void {
+  sink.writeHead(status, { ...CORS_HEADERS })
+  sink.end(JSON.stringify(payload))
 }
 
 function sendApiError(
-  response: ServerResponse,
+  sink: ApiResponseSink,
   status: number,
   body: ApiErrorBody,
 ): void {
-  sendJson(response, status, body)
+  sendJson(sink, status, body)
 }
 
 function readSearchField(value: string | null): LockSearchField {
@@ -79,7 +79,10 @@ function resolveRequestCluster(
   return { cluster: parsed }
 }
 
-function assertValidAddress(value: string, invalidResponse: () => ReturnType<typeof invalidSearchParamsResponse>): void {
+function assertValidAddress(
+  value: string,
+  invalidResponse: () => ReturnType<typeof invalidSearchParamsResponse>,
+): void {
   try {
     assertIsAddress(value)
   } catch (error) {
@@ -89,22 +92,35 @@ function assertValidAddress(value: string, invalidResponse: () => ReturnType<typ
   }
 }
 
-async function handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
-  if (request.method === 'OPTIONS') {
-    sendJson(response, 204, {})
+function isApiErrorResponse(error: unknown): error is { status: number; body: ApiErrorBody } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    'body' in error &&
+    typeof (error as { status: unknown }).status === 'number'
+  )
+}
+
+export async function handleApiRequest(
+  method: string | undefined,
+  url: URL,
+  sink: ApiResponseSink,
+): Promise<void> {
+  if (method === 'OPTIONS') {
+    sendJson(sink, 204, {})
     return
   }
 
-  if (request.method !== 'GET') {
-    sendJson(response, 405, { error: 'Method not allowed.' })
+  if (method !== 'GET') {
+    sendJson(sink, 405, { error: 'Method not allowed.' })
     return
   }
 
-  const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
   const clusterResult = resolveRequestCluster(url)
 
   if ('error' in clusterResult) {
-    sendApiError(response, clusterResult.error.status, clusterResult.error.body)
+    sendApiError(sink, clusterResult.error.status, clusterResult.error.body)
     return
   }
 
@@ -112,7 +128,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
   logApiRequestCluster(cluster, url.pathname)
 
   if (url.pathname === '/api/v1/program') {
-    sendJson(response, 200, {
+    sendJson(sink, 200, {
       cluster,
       programId: CBS_LOCKER_PROGRAM_ID,
       repository: REPOSITORY_URL,
@@ -140,21 +156,21 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
       assertValidAddress(lockAccount, invalidLockAccountResponse)
     } catch (error) {
       if (isApiErrorResponse(error)) {
-        sendApiError(response, error.status, error.body)
+        sendApiError(sink, error.status, error.body)
         return
       }
 
-      sendApiError(response, 400, invalidLockAccountResponse().body)
+      sendApiError(sink, 400, invalidLockAccountResponse().body)
       return
     }
 
     try {
       const lock = await fetchOnChainLock(lockAccount, cluster)
-      sendJson(response, 200, { cluster, lock })
+      sendJson(sink, 200, { cluster, lock })
       return
     } catch (error) {
       const apiError = classifyApiError(error)
-      sendApiError(response, apiError.status, apiError.body)
+      sendApiError(sink, apiError.status, apiError.body)
       return
     }
   }
@@ -169,67 +185,54 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
         assertValidAddress(owner, invalidSearchParamsResponse)
       } catch (error) {
         if (isApiErrorResponse(error)) {
-          sendApiError(response, error.status, error.body)
+          sendApiError(sink, error.status, error.body)
           return
         }
 
-        sendApiError(response, 400, invalidSearchParamsResponse().body)
+        sendApiError(sink, 400, invalidSearchParamsResponse().body)
         return
       }
 
       try {
         const locks = await fetchLocksByOwner(owner, cluster)
-        sendJson(response, 200, { cluster, locks })
+        sendJson(sink, 200, { cluster, locks })
         return
       } catch (error) {
         const apiError = classifyApiError(error)
-        sendApiError(response, apiError.status, apiError.body)
+        sendApiError(sink, apiError.status, apiError.body)
         return
       }
     }
 
     if (!query) {
-      sendJson(response, 200, { cluster, locks: [] })
+      sendJson(sink, 200, { cluster, locks: [] })
       return
     }
 
     try {
       const locks = await searchOnChainLocks(query, field, cluster)
-      sendJson(response, 200, { cluster, locks })
+      sendJson(sink, 200, { cluster, locks })
       return
     } catch (error) {
       const apiError = classifyApiError(error)
-      sendApiError(response, apiError.status, apiError.body)
+      sendApiError(sink, apiError.status, apiError.body)
       return
     }
   }
 
-  sendJson(response, 404, { error: 'Not found.' })
+  sendJson(sink, 404, { error: 'Not found.' })
 }
 
-function isApiErrorResponse(error: unknown): error is { status: number; body: ApiErrorBody } {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'status' in error &&
-    'body' in error &&
-    typeof (error as { status: unknown }).status === 'number'
-  )
+export function createNodeResponseSink(response: {
+  writeHead(status: number, headers: Record<string, string>): void
+  end(body: string): void
+}): ApiResponseSink {
+  return {
+    writeHead(status, headers) {
+      response.writeHead(status, headers)
+    },
+    end(body) {
+      response.end(body)
+    },
+  }
 }
-
-createServer((request, response) => {
-  void handleRequest(request, response).catch((error: unknown) => {
-    if (isApiErrorResponse(error)) {
-      sendApiError(response, error.status, error.body)
-      return
-    }
-
-    const message = error instanceof Error ? error.message : 'Internal server error.'
-    sendJson(response, 500, { error: message })
-  })
-}).listen(PORT, () => {
-  logApiRpcConfiguration()
-  console.log(`CBS Token Locker API listening on http://localhost:${PORT}`)
-  console.log(`Program ID: ${CBS_LOCKER_PROGRAM_ID}`)
-  console.log('API cluster param: cluster=devnet | cluster=mainnet (defaults to devnet)')
-})

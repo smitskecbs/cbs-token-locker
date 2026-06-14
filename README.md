@@ -35,7 +35,7 @@ CBS Token Locker lets project teams lock tokens on Solana with transparent, publ
 
 - **Frontend:** TypeScript + Vite + Solana Kit + Wallet Standard
 - **Program:** Anchor Rust program in `programs/cbs-token-locker`
-- **Public API:** Node server in `api/server.ts`
+- **Public API:** Vercel serverless functions in `api/v1/` (local dev: `scripts/dev-api-server.ts`)
 - **Proof source:** Solana RPC only. No `localStorage` lock records.
 
 ## Program ID
@@ -142,6 +142,31 @@ All API endpoints accept a `cluster` query parameter: `cluster=devnet` or `clust
 | `GET /api/v1/locks/:lockAccount?cluster=` | Read one on-chain lock |
 | `GET /api/v1/locks?owner=&cluster=` | List locks for a wallet |
 | `GET /api/v1/locks?q=&field=&cluster=` | Search on-chain locks |
+
+## Vercel deployment (Devnet)
+
+The frontend builds with Vite (`dist/`) and the Lock API runs as Vercel serverless functions at `/api/v1/*`. SPA routes (`/lock/...`, `/locks`) rewrite to `index.html`.
+
+### Required environment variables
+
+| Variable | Scope | Purpose |
+|---|---|---|
+| `VITE_SOLANA_NETWORK` | Build | Default network (`devnet`) |
+| `VITE_SOLANA_RPC_DEVNET` | Build | Browser RPC for create/unlock on Devnet |
+| `HELIUS_DEVNET_API_KEY` | Runtime (API) | Helius RPC for serverless Lock API |
+
+Set `VITE_LOCK_API_BASE=/api/v1` only if the API is hosted on a different origin.
+
+### Deploy steps
+
+1. Push the repo to GitHub and import the project in [Vercel](https://vercel.com/new).
+2. Framework preset: **Vite** (or Other — `vercel.json` sets build/output).
+3. Add the three required env vars above for **Production** (and Preview if desired).
+4. Deploy. Vercel runs `npm run build` and serves `dist/` plus serverless routes in `api/v1/`.
+5. Open the deployment URL, confirm **Devnet** is selected, and the program status shows deployed.
+6. Switch to **Mainnet** — status should read *not deployed* and Create Lock stays disabled.
+
+Mainnet program deployment is **not** part of this setup. Do not add Mainnet RPC keys until the program is deployed on Mainnet.
 
 ## User flow
 
