@@ -1,8 +1,5 @@
 import { isSolanaError } from '@solana/kit'
 
-import { RPC_RATE_LIMIT_MESSAGE } from '../state/rpcActivityStore'
-import { isRpcRateLimitError } from './rpcFetch'
-
 export type ApiErrorCode =
   | 'RPC_RATE_LIMIT'
   | 'RPC_ERROR'
@@ -21,6 +18,9 @@ export type ApiErrorResponse = {
   body: ApiErrorBody
 }
 
+const RPC_RATE_LIMIT_MESSAGE =
+  'Solana RPC is rate-limiting requests. Please wait a moment and try again.'
+
 const RPC_FAILURE_MESSAGE = 'Unable to load on-chain locks from Solana RPC.'
 
 export function getErrorMessage(error: unknown): string {
@@ -37,6 +37,35 @@ export function getErrorMessage(error: unknown): string {
   }
 
   return 'Unknown error'
+}
+
+function isRpcRateLimitError(error: unknown): boolean {
+  if (isSolanaError(error) && error.context) {
+    const context = error.context as { statusCode?: number; message?: string }
+
+    if (context.statusCode === 429) {
+      return true
+    }
+
+    const message = context.message?.toLowerCase() ?? ''
+
+    if (
+      message.includes('429') ||
+      message.includes('too many requests') ||
+      message.includes('rate limit')
+    ) {
+      return true
+    }
+  }
+
+  const message = getErrorMessage(error).toLowerCase()
+
+  return (
+    message.includes('429') ||
+    message.includes('too many requests') ||
+    message.includes('rate limit') ||
+    message.includes('rate-limiting')
+  )
 }
 
 export function classifyApiError(error: unknown): ApiErrorResponse {

@@ -1,45 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-import { invalidClusterResponse } from '../../src/solana/apiErrors'
-import type { SolanaNetwork } from '../../src/solana/config'
-import { logApiRequestCluster } from '../../src/solana/config'
-import { CBS_LOCKER_PROGRAM_ID } from '../../src/solana/programId'
-import { parseRequestCluster } from '../../src/solana/requestCluster'
+import { CBS_LOCKER_PROGRAM_ID } from '../constants.js'
+import { logApiRequestCluster } from '../rpcConfig.js'
+import { resolveCluster, resolveRequestUrl, setCors } from '../http.js'
 
 const REPOSITORY_URL =
   process.env.CBS_LOCKER_REPOSITORY_URL ||
   'https://github.com/cbs-coin/cbs-token-locker'
-
-function setCors(response: VercelResponse): void {
-  response.setHeader('Access-Control-Allow-Origin', '*')
-  response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-}
-
-function resolveRequestUrl(request: VercelRequest): URL {
-  const protocol = String(request.headers['x-forwarded-proto'] ?? 'https')
-  const host = request.headers.host ?? 'localhost'
-
-  return new URL(request.url ?? '/', `${protocol}://${host}`)
-}
-
-function resolveCluster(
-  url: URL,
-): { cluster: SolanaNetwork } | { error: ReturnType<typeof invalidClusterResponse> } {
-  const rawCluster = url.searchParams.get('cluster')
-
-  if (rawCluster === null || rawCluster.trim() === '') {
-    return { cluster: 'devnet' }
-  }
-
-  const parsed = parseRequestCluster(rawCluster)
-
-  if (!parsed) {
-    return { error: invalidClusterResponse(`Received cluster=${rawCluster}`) }
-  }
-
-  return { cluster: parsed }
-}
 
 export default async function handler(
   request: VercelRequest,

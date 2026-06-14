@@ -4,58 +4,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   classifyApiError,
   getErrorMessage,
-  invalidClusterResponse,
   invalidSearchParamsResponse,
-} from '../../../src/solana/apiErrors'
-import { fetchLocksByOwner, searchOnChainLocks } from '../../../src/solana/client'
-import type { SolanaNetwork } from '../../../src/solana/config'
-import { logApiRequestCluster } from '../../../src/solana/config'
-import { parseRequestCluster } from '../../../src/solana/requestCluster'
-import type { LockSearchField } from '../../../src/types/lock'
-
-function setCors(response: VercelResponse): void {
-  response.setHeader('Access-Control-Allow-Origin', '*')
-  response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-}
-
-function resolveRequestUrl(request: VercelRequest): URL {
-  const protocol = String(request.headers['x-forwarded-proto'] ?? 'https')
-  const host = request.headers.host ?? 'localhost'
-
-  return new URL(request.url ?? '/', `${protocol}://${host}`)
-}
-
-function resolveCluster(
-  url: URL,
-): { cluster: SolanaNetwork } | { error: ReturnType<typeof invalidClusterResponse> } {
-  const rawCluster = url.searchParams.get('cluster')
-
-  if (rawCluster === null || rawCluster.trim() === '') {
-    return { cluster: 'devnet' }
-  }
-
-  const parsed = parseRequestCluster(rawCluster)
-
-  if (!parsed) {
-    return { error: invalidClusterResponse(`Received cluster=${rawCluster}`) }
-  }
-
-  return { cluster: parsed }
-}
-
-function readSearchField(value: string | null): LockSearchField {
-  if (
-    value === 'lockId' ||
-    value === 'wallet' ||
-    value === 'mint' ||
-    value === 'project'
-  ) {
-    return value
-  }
-
-  return 'all'
-}
+} from '../../apiErrors.js'
+import { readSearchField, resolveCluster, resolveRequestUrl, setCors } from '../../http.js'
+import { fetchLocksByOwner, searchOnChainLocks } from '../../lockService.js'
+import { logApiRequestCluster } from '../../rpcConfig.js'
 
 export default async function handler(
   request: VercelRequest,

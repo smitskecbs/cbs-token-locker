@@ -4,64 +4,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   classifyApiError,
   getErrorMessage,
-  invalidClusterResponse,
   invalidLockAccountResponse,
-} from '../../../src/solana/apiErrors'
-import { fetchOnChainLock } from '../../../src/solana/client'
-import type { SolanaNetwork } from '../../../src/solana/config'
-import { logApiRequestCluster } from '../../../src/solana/config'
-import { parseRequestCluster } from '../../../src/solana/requestCluster'
-
-function setCors(response: VercelResponse): void {
-  response.setHeader('Access-Control-Allow-Origin', '*')
-  response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-}
-
-function resolveRequestUrl(request: VercelRequest): URL {
-  const protocol = String(request.headers['x-forwarded-proto'] ?? 'https')
-  const host = request.headers.host ?? 'localhost'
-
-  return new URL(request.url ?? '/', `${protocol}://${host}`)
-}
-
-function resolveCluster(
-  url: URL,
-): { cluster: SolanaNetwork } | { error: ReturnType<typeof invalidClusterResponse> } {
-  const rawCluster = url.searchParams.get('cluster')
-
-  if (rawCluster === null || rawCluster.trim() === '') {
-    return { cluster: 'devnet' }
-  }
-
-  const parsed = parseRequestCluster(rawCluster)
-
-  if (!parsed) {
-    return { error: invalidClusterResponse(`Received cluster=${rawCluster}`) }
-  }
-
-  return { cluster: parsed }
-}
-
-function readLockAccount(request: VercelRequest, url: URL): string | null {
-  const queryValue = request.query.lockAccount
-
-  if (typeof queryValue === 'string' && queryValue.trim()) {
-    return decodeURIComponent(queryValue.trim())
-  }
-
-  if (Array.isArray(queryValue) && queryValue[0]?.trim()) {
-    return decodeURIComponent(queryValue[0].trim())
-  }
-
-  const match = url.pathname.match(/^\/api\/v1\/locks\/([^/]+)$/)
-
-  if (!match) {
-    return null
-  }
-
-  return decodeURIComponent(match[1])
-}
+} from '../../apiErrors.js'
+import { fetchOnChainLock } from '../../fetchLock.js'
+import { readLockAccount, resolveCluster, resolveRequestUrl, setCors } from '../../http.js'
+import { logApiRequestCluster } from '../../rpcConfig.js'
 
 export default async function handler(
   request: VercelRequest,
