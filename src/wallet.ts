@@ -1,6 +1,7 @@
 import { getBase58Decoder } from '@solana/codecs-strings'
 import { getWallets } from '@wallet-standard/app'
 
+import { isDebugPanelVisible } from './state/debugStore'
 import {
   getDefaultNetwork,
   getSolanaChainId,
@@ -495,26 +496,138 @@ function createWalletStandardProvider(
   return normalizeProvider(provider)
 }
 
-function registerWallet(
-  wallet: DetectedWallet,
+const BRANDED_INJECTED_WALLET_IDS = new Set([
+  'phantom',
+  'solflare',
+  'backpack',
+  'glow',
+])
+
+function normalizeWalletName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function getWalletSourcePriority(wallet: DetectedWallet): number {
+  if (wallet.source === 'wallet-standard') {
+    return 0
+  }
+
+  if (BRANDED_INJECTED_WALLET_IDS.has(wallet.id)) {
+    return 1
+  }
+
+  return 2
+}
+
+function pickPreferredWallet(candidates: DetectedWallet[]): DetectedWallet {
+  return candidates.reduce((best, current) => {
+    const bestPriority = getWalletSourcePriority(best)
+    const currentPriority = getWalletSourcePriority(current)
+
+    if (currentPriority < bestPriority) {
+      return current
+    }
+
+    if (currentPriority > bestPriority) {
+      return best
+    }
+
+    return best
+  })
+}
+
+function collectUniqueProviderWallets(
+  wallets: DetectedWallet[],
   seenProviders: Set<SolanaWalletProvider>,
+): DetectedWallet[] {
+  const collected: DetectedWallet[] = []
+
+  for (const wallet of wallets) {
+    if (seenProviders.has(wallet.provider)) {
+      continue
+    }
+
+    seenProviders.add(wallet.provider)
+    collected.push(wallet)
+  }
+
+  return collected
+}
+
+function deduplicateWalletsByName(wallets: DetectedWallet[]): {
+  deduplicated: DetectedWallet[]
+  duplicateResolutions: Array<{
+    normalizedName: string
+    kept: DetectedWallet
+    dropped: DetectedWallet
+  }>
+} {
+  const grouped = new Map<string, DetectedWallet[]>()
+
+  for (const wallet of wallets) {
+    const key = normalizeWalletName(wallet.name)
+    const group = grouped.get(key) ?? []
+    group.push(wallet)
+    grouped.set(key, group)
+  }
+
+  const deduplicated: DetectedWallet[] = []
+  const duplicateResolutions: Array<{
+    normalizedName: string
+    kept: DetectedWallet
+    dropped: DetectedWallet
+  }> = []
+
+  for (const [normalizedName, group] of grouped) {
+    const kept = pickPreferredWallet(group)
+    deduplicated.push(kept)
+
+    for (const wallet of group) {
+      if (wallet !== kept) {
+        duplicateResolutions.push({
+          normalizedName,
+          kept,
+          dropped: wallet,
+        })
+      }
+    }
+  }
+
+  return { deduplicated, duplicateResolutions }
+}
+
+function logWalletDetectionDebug(
+  allDetected: DetectedWallet[],
+  deduplicated: DetectedWallet[],
+  duplicateResolutions: Array<{
+    normalizedName: string
+    kept: DetectedWallet
+    dropped: DetectedWallet
+  }>,
 ): void {
-  if (seenProviders.has(wallet.provider)) {
+  if (!isDebugPanelVisible()) {
     return
   }
 
-  seenProviders.add(wallet.provider)
-
-  let walletId = wallet.id
-
-  if (providerRegistry.has(walletId)) {
-    walletId = `${walletId}-${wallet.source}`
-  }
-
-  providerRegistry.set(walletId, {
-    ...wallet,
-    id: walletId,
+  const formatWallet = (wallet: DetectedWallet) => ({
+    id: wallet.id,
+    name: wallet.name,
+    normalizedName: normalizeWalletName(wallet.name),
+    source: wallet.source,
+    priority: getWalletSourcePriority(wallet),
   })
+
+  console.log('[wallet] all detected providers:', allDetected.map(formatWallet))
+  console.log('[wallet] deduplicated wallet list:', deduplicated.map(formatWallet))
+
+  for (const resolution of duplicateResolutions) {
+    console.log(
+      `[wallet] kept duplicate for "${resolution.normalizedName}":`,
+      formatWallet(resolution.kept),
+      'dropped:',
+      formatWallet(resolution.dropped),
+    )
+  }
 }
 
 function getGlowProvider(): SolanaWalletProvider | undefined {
@@ -623,13 +736,17 @@ export function detectAvailableWallets(): DetectedWallet[] {
   providerRegistry.clear()
 
   const seenProviders = new Set<SolanaWalletProvider>()
+  const allDetected = [
+    ...collectUniqueProviderWallets(detectInjectedWallets(), seenProviders),
+    ...collectUniqueProviderWallets(detectWalletStandardProviders(), seenProviders),
+  ]
 
-  for (const wallet of detectInjectedWallets()) {
-    registerWallet(wallet, seenProviders)
-  }
+  const { deduplicated, duplicateResolutions } = deduplicateWalletsByName(allDetected)
 
-  for (const wallet of detectWalletStandardProviders()) {
-    registerWallet(wallet, seenProviders)
+  logWalletDetectionDebug(allDetected, deduplicated, duplicateResolutions)
+
+  for (const wallet of deduplicated) {
+    providerRegistry.set(wallet.id, wallet)
   }
 
   return Array.from(providerRegistry.values()).sort((left, right) => {
