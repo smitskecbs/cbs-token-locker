@@ -24,8 +24,12 @@ export function renderHowItWorksModal(): string {
             <span>Connect the wallet that owns the tokens.</span>
           </li>
           <li>
-            <strong>Select Token</strong>
-            <span>Choose the SPL token you want to lock.</span>
+            <strong>Select Token Type</strong>
+            <span>Choose whether you want to lock a normal SPL token or an LP token.</span>
+          </li>
+          <li>
+            <strong>Enter Mint</strong>
+            <span>Paste the SPL token mint or LP token mint address.</span>
           </li>
           <li>
             <strong>Set Amount</strong>

@@ -712,6 +712,111 @@ body {
   color: #b45309;
 }
 
+.certificate-header__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+}
+
+.lock-type-badge {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(216, 111, 0, 0.22);
+  background: rgba(255, 179, 71, 0.12);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9a4d00;
+}
+
+.token-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(216, 111, 0, 0.18);
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #666666;
+  flex-shrink: 0;
+}
+
+.token-type-badge--spl {
+  border-color: rgba(21, 128, 61, 0.2);
+  background: rgba(21, 128, 61, 0.08);
+  color: #15803d;
+}
+
+.token-type-badge--lp {
+  border-color: rgba(124, 58, 237, 0.2);
+  background: rgba(124, 58, 237, 0.08);
+  color: #6d28d9;
+}
+
+.compact-info-note {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(216, 111, 0, 0.14);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 179, 71, 0.08), #ffffff 72%);
+  display: grid;
+  gap: 8px;
+}
+
+.compact-info-note__body,
+.compact-info-note__warning {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #555555;
+}
+
+.compact-info-note__warning {
+  color: #9a3412;
+}
+
+.form-classification-note {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #666666;
+}
+
+.preview-lp-note {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  background: #fffaf5;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #9a3412;
+}
+
+.lock-card__heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lock-summary-item__meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .certificate-facts {
   margin: 0 0 20px;
   display: grid;

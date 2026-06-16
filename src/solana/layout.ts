@@ -83,7 +83,7 @@ export function parseTokenLockAccount(data: Uint8Array): OnChainTokenLock | null
     unlockTimestamp,
     createdAt,
     lockSeed,
-    tokenType: tokenTypeByte === 1 ? 'lp' : 'spl',
+    tokenType: tokenTypeByte === 1 ? 'lp' : tokenTypeByte === 0 ? 'spl' : 'unknown',
     isUnlocked,
     bump,
     vaultBump,

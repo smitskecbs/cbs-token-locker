@@ -11,6 +11,7 @@ import { renderLockStatusMarkup } from '../utils/lockDisplay'
 
 export function renderLockPreviewModal(preview: PreviewLock): string {
   const status = getLockStatus(preview.unlockAt)
+  const isLp = preview.tokenType === 'lp'
 
   return `
     <div class="modal-overlay" id="lockPreviewModal" data-lock-preview-modal>
@@ -35,7 +36,7 @@ export function renderLockPreviewModal(preview: PreviewLock): string {
             <dd class="mono">${escapeHtml(preview.tokenMint)}</dd>
           </div>
           <div class="detail-item">
-            <dt>Token Type</dt>
+            <dt>Lock Type</dt>
             <dd>${escapeHtml(formatTokenType(preview.tokenType))}</dd>
           </div>
           <div class="detail-item">
@@ -55,6 +56,17 @@ export function renderLockPreviewModal(preview: PreviewLock): string {
             <dd>${renderLockStatusMarkup(status)}</dd>
           </div>
         </dl>
+
+        ${
+          isLp
+            ? `
+              <p class="preview-lp-note">
+                Make sure this is the LP token mint from your wallet, not one of the pool tokens or
+                the pool address.
+              </p>
+            `
+            : ''
+        }
 
         <div class="modal-actions">
           <button type="button" class="secondary-btn" data-lock-preview-cancel>

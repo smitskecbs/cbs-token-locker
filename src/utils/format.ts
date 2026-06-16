@@ -1,7 +1,15 @@
 import type { TokenType } from '../types/lock'
 
 export function formatTokenType(tokenType: TokenType): string {
-  return tokenType === 'lp' ? 'LP Token' : 'SPL Token'
+  if (tokenType === 'lp') {
+    return 'LP Token'
+  }
+
+  if (tokenType === 'spl') {
+    return 'SPL Token'
+  }
+
+  return 'Token'
 }
 
 export function formatWalletAddress(

@@ -15,6 +15,7 @@ import {
   isUnlockTimeReached,
   renderLockStatusMarkup,
 } from '../utils/lockDisplay'
+import { formatLockTypeCertificateBadge } from '../utils/tokenTypeDisplay'
 import {
   closeLockDetailView,
   peekLockDetailReturnTarget,
@@ -118,6 +119,8 @@ function renderLockDetails(
     ? '<p class="certificate-badge">Verified On-Chain</p>'
     : '<p class="certificate-badge certificate-badge--warning">Not verified</p>'
 
+  const lockTypeBadge = `<p class="lock-type-badge">${escapeHtml(formatLockTypeCertificateBadge(lock.tokenType))}</p>`
+
   return `
     <main class="app-shell app-shell--simple">
       <section class="main-card lock-certificate" aria-labelledby="lock-detail-heading">
@@ -134,7 +137,10 @@ function renderLockDetails(
         <header class="certificate-header">
           <p class="certificate-eyebrow">CBS Token Locker</p>
           <h1 class="certificate-title" id="lock-detail-heading">${escapeHtml(lock.projectName)}</h1>
-          ${verificationLabel}
+          <div class="certificate-header__badges">
+            ${lockTypeBadge}
+            ${verificationLabel}
+          </div>
         </header>
 
         <dl class="certificate-facts">

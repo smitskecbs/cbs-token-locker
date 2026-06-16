@@ -62,6 +62,7 @@ import {
 } from '../wallet'
 import { renderClusterAdvancedDetails, renderWalletNetworkSection } from '../components/clusterPanel'
 import { renderDebugPanel } from '../components/debugPanel'
+import { attachCreateLockTokenTypeUi } from '../components/createLockForm'
 import { renderLockPreviewModal } from '../components/lockPreviewModal'
 import type { AppTabId } from '../components/mainAppCard'
 import { renderHistoryPanel, type HistoryPanelState } from '../components/historySection'
@@ -992,6 +993,8 @@ function openLockPreviewModal(preview: PreviewLock): void {
 }
 
 function attachCreateLockHandlers(): void {
+  attachCreateLockTokenTypeUi()
+
   const form = document.querySelector<HTMLFormElement>('#createLockForm')
 
   const handleFormChange = () => {

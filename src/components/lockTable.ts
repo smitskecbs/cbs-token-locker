@@ -7,6 +7,7 @@ import {
   renderLockStatusMarkup,
 } from '../utils/lockDisplay'
 import { formatDateTime } from '../utils/format'
+import { renderTokenTypeBadgeMarkup } from '../utils/tokenTypeDisplay'
 import { escapeHtml } from '../utils/html'
 
 export async function enrichLocksWithMintDecimals(locks: LockRecord[]): Promise<void> {
@@ -63,7 +64,10 @@ function renderLockCard(
   return `
     <article class="lock-card" data-lock-account="${escapeHtml(lock.lockAccount)}">
       <div class="lock-card__top">
-        <h3 class="lock-card__title">${escapeHtml(lock.projectName)}</h3>
+        <div class="lock-card__heading">
+          <h3 class="lock-card__title">${escapeHtml(lock.projectName)}</h3>
+          ${renderTokenTypeBadgeMarkup(lock.tokenType)}
+        </div>
         <span data-lock-status>${renderLockStatusMarkup(status)}</span>
       </div>
       <p class="lock-card__line">
@@ -182,6 +186,7 @@ export function renderLockSummaryList(
                 ${escapeHtml(lock.projectName)}
               </a>
               <span class="lock-summary-item__meta">
+                ${renderTokenTypeBadgeMarkup(lock.tokenType)}
                 ${escapeHtml(amount.human)} · ${renderLockStatusMarkup(status)}
               </span>
             </li>

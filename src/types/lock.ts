@@ -1,4 +1,4 @@
-export type TokenType = 'spl' | 'lp'
+export type TokenType = 'spl' | 'lp' | 'unknown'
 
 export type LockStatus = 'active' | 'unlock_available' | 'unlocked'
 

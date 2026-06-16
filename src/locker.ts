@@ -198,7 +198,15 @@ export async function createOnChainLockRecord(
 }
 
 export function getTokenTypeLabel(tokenType: TokenType): string {
-  return tokenType === 'lp' ? 'LP Token' : 'SPL Token'
+  if (tokenType === 'lp') {
+    return 'LP Token'
+  }
+
+  if (tokenType === 'spl') {
+    return 'SPL Token'
+  }
+
+  return 'Token'
 }
 
 export function getPublicLockPath(lockAccount: string): string {

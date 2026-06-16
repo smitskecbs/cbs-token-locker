@@ -7,7 +7,7 @@ export function renderOverviewSection(): string {
         and give your community more transparency.
       </p>
       <ul class="info-card__list">
-        <li>Lock SPL tokens</li>
+        <li>Lock SPL tokens or LP tokens</li>
         <li>Set an unlock date</li>
         <li>View lock details</li>
         <li>Share public lock proof</li>
