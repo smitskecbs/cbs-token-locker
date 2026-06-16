@@ -791,6 +791,61 @@ body {
   color: #666666;
 }
 
+.amount-shortcuts {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.amount-shortcuts__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.amount-shortcut-btn {
+  min-height: 36px;
+  min-width: 52px;
+  padding: 8px 12px;
+  border: 1px solid rgba(216, 111, 0, 0.22);
+  border-radius: 999px;
+  background: #fffaf5;
+  color: #9a4d00;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.amount-shortcut-btn:hover {
+  background: rgba(255, 179, 71, 0.18);
+  border-color: rgba(216, 111, 0, 0.35);
+}
+
+.amount-shortcut-btn:active {
+  transform: scale(0.97);
+}
+
+.amount-shortcut-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.amount-shortcuts__available {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #444444;
+}
+
+.amount-shortcuts__feedback {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #b45309;
+}
+
 .preview-lp-note {
   margin: 0 0 16px;
   padding: 10px 12px;

@@ -124,7 +124,7 @@ export function renderCreateLockForm(): string {
           <span class="field-hint">Choose SPL Token or LP Token.</span>
         </label>
 
-        <label class="field">
+        <label class="field field--amount">
           <span class="field-label" id="amountLabel">${SPL_AMOUNT_LABEL}</span>
           <input
             class="field-input"
@@ -135,6 +135,17 @@ export function renderCreateLockForm(): string {
             required
             placeholder="1000"
           />
+          <div class="amount-shortcuts" data-amount-shortcuts>
+            <div class="amount-shortcuts__buttons">
+              <button type="button" class="amount-shortcut-btn" data-amount-pct="10">10%</button>
+              <button type="button" class="amount-shortcut-btn" data-amount-pct="25">25%</button>
+              <button type="button" class="amount-shortcut-btn" data-amount-pct="50">50%</button>
+              <button type="button" class="amount-shortcut-btn" data-amount-pct="75">75%</button>
+              <button type="button" class="amount-shortcut-btn" data-amount-pct="max">Max</button>
+            </div>
+            <p class="amount-shortcuts__available" id="amountAvailableBalance" hidden></p>
+            <p class="amount-shortcuts__feedback" id="amountShortcutsFeedback" role="status" hidden></p>
+          </div>
           <span class="field-hint" id="amountHint">${SPL_AMOUNT_HINT}</span>
         </label>
       </div>

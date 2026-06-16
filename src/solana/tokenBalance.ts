@@ -5,6 +5,59 @@ import { OnChainLockerError } from './client'
 import { TOKEN_PROGRAM_ID } from './programId'
 import { getSolanaRpc } from './rpc'
 
+export type OwnerTokenBalanceFetchResult =
+  | {
+      kind: 'success'
+      rawAmount: bigint
+      decimals: number
+    }
+  | {
+      kind: 'mint_not_found'
+    }
+  | {
+      kind: 'load_failed'
+    }
+
+export async function fetchOwnerTokenBalance(input: {
+  ownerAddress: string
+  mintAddress: string
+}): Promise<OwnerTokenBalanceFetchResult> {
+  try {
+    assertIsAddress(input.ownerAddress)
+    assertIsAddress(input.mintAddress)
+  } catch {
+    return { kind: 'mint_not_found' }
+  }
+
+  try {
+    const rpc = getSolanaRpc()
+    const owner = address(input.ownerAddress)
+    const mint = address(input.mintAddress)
+    const mintAccount = await fetchMaybeMint(rpc, mint)
+
+    if (!mintAccount.exists) {
+      return { kind: 'mint_not_found' }
+    }
+
+    const [ownerTokenAccount] = await findAssociatedTokenPda({
+      owner,
+      mint,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+
+    const tokenAccount = await fetchMaybeToken(rpc, ownerTokenAccount)
+    const rawAmount = tokenAccount.exists ? tokenAccount.data.amount : 0n
+
+    return {
+      kind: 'success',
+      rawAmount,
+      decimals: mintAccount.data.decimals,
+    }
+  } catch {
+    return { kind: 'load_failed' }
+  }
+}
+
 export async function validateOwnerTokenBalance(input: {
   ownerAddress: string
   mintAddress: string
