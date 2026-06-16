@@ -1,47 +1,24 @@
-import { renderFeatureCardGrid } from './featureCard'
-
-export function renderHowItWorksSection(options?: { embedded?: boolean }): string {
-  const embedded = options?.embedded === true
-  const heading = embedded
-    ? `<h3 class="technical-details__heading">How It Works</h3>`
-    : `<h2 class="section-title" id="how-it-works-heading">How It Works</h2>`
-
-  const content = renderFeatureCardGrid([
-    {
-      title: 'Lock tokens on-chain',
-      body:
-        'Submit a wallet transaction to move tokens into a program-controlled vault until the unlock date.',
-    },
-    {
-      title: 'Public verification',
-      body:
-        'Every lock has a public page showing vault balance, owner wallet, unlock time, and on-chain status.',
-    },
-    {
-      title: 'Owner-only unlock',
-      body:
-        'After the unlock date, only the original locker wallet can return tokens from the vault.',
-    },
-    {
-      title: 'Transparency, not guarantees',
-      body:
-        'On-chain locking improves transparency but does not guarantee project legitimacy, liquidity, or future value.',
-      variant: 'warning',
-    },
-  ])
-
-  if (embedded) {
-    return `<div class="technical-details__block">${heading}${content}</div>`
-  }
-
+export function renderHowItWorksSection(): string {
   return `
     <section
-      class="page-section"
+      class="info-card how-it-works-card"
       id="how-it-works"
       aria-labelledby="how-it-works-heading"
     >
-      ${heading}
-      ${content}
+      <button
+        type="button"
+        class="how-it-works-card__trigger"
+        data-how-it-works-open
+        aria-haspopup="dialog"
+      >
+        <span class="how-it-works-card__content">
+          <h2 class="info-card__title" id="how-it-works-heading">How the Token Locker Works</h2>
+          <p class="info-card__lead">
+            Create a lock, deposit tokens into the vault and unlock them only after the selected unlock date.
+          </p>
+        </span>
+        <span class="secondary-btn how-it-works-card__btn">Learn More</span>
+      </button>
     </section>
   `
 }

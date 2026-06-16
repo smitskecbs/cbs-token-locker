@@ -70,6 +70,7 @@ import {
   enrichLocksWithMintDecimals,
 } from '../components/lockTable'
 import { renderSearchResults } from '../components/publicLockSearch'
+import { attachHowItWorksModalHandlers } from '../app/renderApp'
 import { attachSiteFooterHandlers } from '../components/siteFooter'
 import { renderWalletBar } from '../components/walletPanel'
 let pendingLockInput: CreateLockInput | null = null
@@ -1161,6 +1162,7 @@ export function attachAppHandlers(): void {
   })
 
   attachSiteFooterHandlers()
+  attachHowItWorksModalHandlers()
   attachClusterHandlers()
   attachWalletHandlers()
   attachCreateLockHandlers()

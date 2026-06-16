@@ -29,6 +29,7 @@ import {
 } from '../wallet'
 
 import { renderSiteFooter, attachSiteFooterHandlers } from './siteFooter'
+import { renderSupportBlock } from './supportBlock'
 
 export type LockDetailContext = {
   lock: LockRecord | null
@@ -214,6 +215,7 @@ function renderLockDetails(
           </div>
         </details>
       </section>
+      ${renderSupportBlock()}
       ${renderSiteFooter()}
     </main>
   `
@@ -250,6 +252,7 @@ export function renderLockDetailPage(context: LockDetailContext, lockAccount: st
             <button type="button" class="primary-btn" data-lock-detail-back>${escapeHtml(backLabel)}</button>
           </div>
         </section>
+        ${renderSupportBlock()}
         ${renderSiteFooter()}
       </main>
     `

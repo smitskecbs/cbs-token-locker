@@ -10,6 +10,7 @@ import {
 } from '../components/lockDetailPage'
 import { renderPublicLockSearch } from '../components/publicLockSearch'
 import { renderSiteFooter } from '../components/siteFooter'
+import { renderSupportBlock } from '../components/supportBlock'
 import type { AppRoute } from './index'
 
 export function renderRoute(route: AppRoute): void {
@@ -37,8 +38,9 @@ export function renderRoute(route: AppRoute): void {
     stopLockDetailLiveRefresh()
     document.title = 'Search Locks — CBS Token Locker'
     app.innerHTML = `
-      <main class="app-shell app-shell--simple">
+      <main class="app-shell">
         ${renderPublicLockSearch([], route.search ?? '', route.field ?? 'all', Boolean(route.search))}
+        ${renderSupportBlock()}
         ${renderSiteFooter()}
       </main>
     `

@@ -8,8 +8,7 @@ let siteFooterHandlersAttached = false
 export function renderSiteFooter(): string {
   return `
     <footer class="site-footer">
-      <p class="site-footer__text">
-        Part of the
+      <nav class="site-footer__links" aria-label="CBS ecosystem links">
         <a
           class="site-footer__link"
           href="https://tools.cbs-coin.com"
@@ -18,11 +17,34 @@ export function renderSiteFooter(): string {
         >
           CBS Tools
         </a>
-        ecosystem
-      </p>
-      <button type="button" class="site-footer__donate secondary-btn" data-donation-copy>
-        ☕ Support Development
-      </button>
+        <a
+          class="site-footer__link"
+          href="https://cbs-coin.com"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          CBS Coin
+        </a>
+        <a
+          class="site-footer__link"
+          href="https://github.com/smitskecbs"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          GitHub
+        </a>
+      </nav>
+
+      <div class="site-footer__open">
+        <p class="site-footer__open-title">Built in the Open</p>
+        <p class="site-footer__open-text">
+          CBS Tools is developed publicly and transparently.
+          Source code, improvements and community contributions can be followed on GitHub.
+        </p>
+      </div>
+
+      <p class="site-footer__badges">Open Source • Community Driven • Built on Solana</p>
+      <p class="site-footer__tagline">Community-built tools for Solana builders.</p>
     </footer>
   `
 }
@@ -41,7 +63,7 @@ export function attachSiteFooterHandlers(): void {
       return
     }
 
-    const button = target.closest<HTMLButtonElement>('[data-donation-copy]')
+    const button = target.closest<HTMLButtonElement>('[data-donation-copy], [data-support-copy]')
 
     if (!button) {
       return

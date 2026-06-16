@@ -1,5 +1,4 @@
 import type { LockRecord, LockSearchField } from '../types/lock'
-import bannerUrl from '../assets/banner.png'
 import { renderCreateLockForm } from './createLockForm'
 import { renderHistoryPanel } from './historySection'
 import { renderMyLocksContent } from './myLocksSection'
@@ -50,15 +49,7 @@ export function renderMainAppCard(input: {
   }
 
   return `
-    <section class="main-card" id="main-app" aria-label="CBS Token Locker">
-      <div class="main-card__banner-wrap">
-        <img
-          class="main-card__banner"
-          src="${bannerUrl}"
-          alt=""
-          decoding="async"
-        />
-      </div>
+    <section class="main-card locker-card" id="main-app" aria-label="CBS Token Locker">
       ${renderWalletBar()}
 
       <nav class="app-tabs" role="tablist" aria-label="Locker sections">
