@@ -1,0 +1,9 @@
+<svg width="101" height="88" viewBox="0 0 101 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M100.48 69.3811H86.4801L100.48 55.383V69.3811ZM63.7041 32.6055L49.7057 46.6039V32.6055H63.7041ZM100.48 32.6055L86.4816 46.6039H100.48V32.6055ZM49.7057 69.3811H35.7073L49.7057 55.3827V69.3811ZM14.4801 32.6055L0.481689 46.6039V32.6055H14.4801ZM49.7057 32.6055L35.7073 46.6039H49.7057V32.6055ZM35.7073 69.3811H21.7089L35.7073 55.3827V69.3811ZM86.4816 69.3811H72.4832L86.4816 55.3827V69.3811ZM72.4832 32.6055L58.4848 46.6039V32.6055H72.4832Z" fill="url(#solana_logomark_gradient)"/>
+  <defs>
+    <linearGradient id="solana_logomark_gradient" x1="8.525" y1="90.0973" x2="88.8811" y2="-3.011" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9945FF"/>
+      <stop offset="1" stop-color="#14F195"/>
+    </linearGradient>
+  </defs>
+</svg>
