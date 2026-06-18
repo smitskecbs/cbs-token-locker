@@ -62,9 +62,17 @@ import {
 } from '../wallet'
 import { renderClusterAdvancedDetails, renderWalletNetworkSection } from '../components/clusterPanel'
 import { renderDebugPanel } from '../components/debugPanel'
-import { attachCreateLockTokenTypeUi } from '../components/createLockForm'
+import { attachCreateLockModeUi, attachCreateLockTokenTypeUi, readLockMode } from '../components/createLockForm'
 import { renderLockPreviewModal } from '../components/lockPreviewModal'
+import { renderSplitLockPreviewModal } from '../components/splitLockPreviewModal'
 import { attachCreateLockAmountShortcuts } from '../utils/createLockAmountShortcuts'
+import { executeSplitLocks } from '../utils/executeSplitLocks'
+import { fetchMintDecimals } from '../solana/mintDecimals'
+import {
+  buildSplitLockPreview,
+  splitLockToCreateLockInputs,
+} from '../utils/splitLock'
+import type { SplitLockInput, SplitLockInterval, SplitLockPreview } from '../types/splitLock'
 import type { AppTabId } from '../components/mainAppCard'
 import { renderHistoryPanel, type HistoryPanelState } from '../components/historySection'
 import { renderMyLocksContent } from '../components/myLocksSection'
@@ -77,6 +85,8 @@ import { attachSiteFooterHandlers } from '../components/siteFooter'
 import { renderWalletBar } from '../components/walletPanel'
 let pendingLockInput: CreateLockInput | null = null
 let pendingPreview: PreviewLock | null = null
+let pendingSplitLockPreview: SplitLockPreview | null = null
+let pendingSplitLockInputs: CreateLockInput[] | null = null
 let createLockProgressActive = false
 let myLocksCache: LockRecord[] = []
 let walletLocksCacheKey: string | null = null
@@ -820,6 +830,25 @@ function attachWalletHandlers(): void {
   })
 }
 
+function readSplitLockInput(form: HTMLFormElement): SplitLockInput {
+  const walletState = getWalletConnectionState()
+  const formData = new FormData(form)
+  const interval = String(formData.get('splitInterval') ?? 'yearly')
+
+  return {
+    projectName: String(formData.get('projectName') ?? ''),
+    projectDescription: String(formData.get('projectDescription') ?? ''),
+    tokenMint: String(formData.get('tokenMint') ?? ''),
+    tokenType: String(formData.get('tokenType') ?? 'spl') as TokenType,
+    totalAmount: String(formData.get('amount') ?? ''),
+    unlockCount: Number(formData.get('splitUnlockCount') ?? ''),
+    interval: (interval === 'monthly' ? 'monthly' : 'yearly') as SplitLockInterval,
+    firstUnlockDate: String(formData.get('splitFirstUnlockDate') ?? ''),
+    firstUnlockTime: String(formData.get('splitFirstUnlockTime') ?? ''),
+    lockerWallet: walletState.address ?? '',
+  }
+}
+
 function readCreateLockInput(form: HTMLFormElement): CreateLockInput {
   const walletState = getWalletConnectionState()
   const formData = new FormData(form)
@@ -836,9 +865,10 @@ function readCreateLockInput(form: HTMLFormElement): CreateLockInput {
   }
 }
 
-function showCreateLockSuccess(): void {
+function showCreateLockSuccess(message?: string): void {
   const successElement = document.querySelector<HTMLElement>('#createLockSuccess')
   const errorElement = document.querySelector<HTMLElement>('#createLockError')
+  const successBody = document.querySelector<HTMLElement>('#createLockSuccessBody')
 
   if (errorElement) {
     errorElement.textContent = ''
@@ -846,6 +876,12 @@ function showCreateLockSuccess(): void {
   }
 
   document.querySelector('#createLockSimulationDebug')?.remove()
+
+  if (successBody) {
+    successBody.textContent =
+      message ??
+      'Your tokens are now held in an on-chain vault until the unlock date.'
+  }
 
   if (!successElement) {
     return
@@ -904,6 +940,124 @@ function clearCreateLockError(): void {
   errorElement.hidden = true
   document.querySelector('#createLockSimulationDebug')?.remove()
   clearSimulationDiagnostics()
+}
+
+function closeSplitLockPreviewModal(): void {
+  document.querySelector('[data-split-lock-preview-modal]')?.remove()
+}
+
+function openSplitLockPreviewModal(preview: SplitLockPreview): void {
+  closeSplitLockPreviewModal()
+  document.body.insertAdjacentHTML('beforeend', renderSplitLockPreviewModal(preview))
+
+  const modal = document.querySelector('[data-split-lock-preview-modal]')
+
+  modal?.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      closeSplitLockPreviewModal()
+    }
+  })
+
+  modal?.querySelector('[data-split-lock-preview-cancel]')?.addEventListener('click', () => {
+    closeSplitLockPreviewModal()
+  })
+
+  modal?.querySelector('[data-split-lock-preview-confirm]')?.addEventListener('click', () => {
+    void handleSplitLockConfirm()
+  })
+}
+
+async function handleSplitLockConfirm(): Promise<void> {
+  if (!pendingSplitLockInputs || !pendingSplitLockPreview) {
+    return
+  }
+
+  const programStatus = getProgramStatus()
+
+  if (!programStatus.statusKnown && programStatus.error) {
+    showCreateLockError(programStatus.error)
+    closeSplitLockPreviewModal()
+    return
+  }
+
+  if (!programStatus.deployed) {
+    showCreateLockError(`CBS Locker Program is not deployed on ${getSelectedClusterLabel()} yet.`)
+    closeSplitLockPreviewModal()
+    return
+  }
+
+  const walletProvider = getConnectedWalletProvider()
+
+  if (!walletProvider) {
+    showCreateLockError('Connect your wallet before creating on-chain locks.')
+    closeSplitLockPreviewModal()
+    return
+  }
+
+  closeSplitLockPreviewModal()
+  clearCreateLockError()
+
+  createLockProgressActive = true
+  setLockCreationInProgress(true)
+  stopAppLiveRefresh()
+  refreshCreateLockAvailability()
+
+  const trancheMeta = pendingSplitLockPreview.tranches.map((tranche) => ({
+    amount: tranche.amount,
+    unlockAt: tranche.unlockAt,
+  }))
+
+  try {
+    const result = await executeSplitLocks(
+      pendingSplitLockInputs,
+      walletProvider,
+      trancheMeta,
+    )
+
+    pendingSplitLockPreview = null
+    pendingSplitLockInputs = null
+
+    if (result.completed.length > 0) {
+      const lastLock = result.completed[result.completed.length - 1]
+      setLastTransactionSignature(lastLock.createSignature ?? null)
+      setLastLockPdas(lastLock.lockAccount, lastLock.vault)
+    }
+
+    setLastError(result.errorMessage)
+    clearSimulationDiagnostics()
+    refreshDebugPanel()
+
+    if (result.failedAt) {
+      showCreateLockError(
+        `${result.completed.length} of ${trancheMeta.length} locks created. Lock ${result.failedAt} failed: ${result.errorMessage ?? 'Unknown error.'}`,
+      )
+    } else {
+      const successTitle = document.querySelector<HTMLElement>('.success-panel__title')
+
+      if (successTitle) {
+        successTitle.textContent = 'Split locks created successfully.'
+      }
+
+      showCreateLockSuccess(
+        `${result.completed.length} separate locks were created. Each unlock is independent.`,
+      )
+    }
+
+    await refreshMyLocksSection({ force: true, source: 'my-locks:split-create-success' })
+  } catch (error) {
+    const diagnostics = extractDiagnostics(error)
+    const message =
+      error instanceof OnChainLockerError
+        ? error.message
+        : formatLockerError(error, getSelectedClusterLabel())
+
+    showCreateLockError(message, diagnostics)
+  } finally {
+    createLockProgressActive = false
+    setLockCreationInProgress(false)
+    startLocalCountdownRefresh()
+    refreshCreateLockAvailability()
+  }
 }
 
 function closeLockPreviewModal(): void {
@@ -995,6 +1149,10 @@ function openLockPreviewModal(preview: PreviewLock): void {
 
 function attachCreateLockHandlers(): void {
   attachCreateLockTokenTypeUi()
+  attachCreateLockModeUi(() => {
+    clearCreateLockError()
+    refreshCreateLockAvailability()
+  })
   attachCreateLockAmountShortcuts(() => {
     clearCreateLockError()
     refreshCreateLockAvailability()
@@ -1027,9 +1185,16 @@ function attachCreateLockHandlers(): void {
       return
     }
 
+    if (readLockMode(form) === 'split') {
+      void submitSplitLockForm(form)
+      return
+    }
+
     try {
       pendingLockInput = readCreateLockInput(form)
       pendingPreview = buildLockPreview(pendingLockInput)
+      pendingSplitLockPreview = null
+      pendingSplitLockInputs = null
       openLockPreviewModal(pendingPreview)
     } catch (error) {
       pendingPreview = null
@@ -1043,6 +1208,35 @@ function attachCreateLockHandlers(): void {
       refreshCreateLockAvailability()
     }
   })
+}
+
+async function submitSplitLockForm(form: HTMLFormElement): Promise<void> {
+  try {
+    const splitInput = readSplitLockInput(form)
+    const decimals = await fetchMintDecimals(splitInput.tokenMint)
+
+    if (decimals === null) {
+      throw new LockerValidationError(
+        'Invalid mint address or mint account not found on this cluster.',
+      )
+    }
+
+    pendingSplitLockPreview = buildSplitLockPreview(splitInput, decimals)
+    pendingSplitLockInputs = splitLockToCreateLockInputs(splitInput, decimals)
+    pendingLockInput = null
+    pendingPreview = null
+    openSplitLockPreviewModal(pendingSplitLockPreview)
+  } catch (error) {
+    pendingSplitLockPreview = null
+    pendingSplitLockInputs = null
+    const message =
+      error instanceof LockerValidationError
+        ? error.message
+        : 'Unable to prepare split lock schedule.'
+
+    showCreateLockError(message)
+    refreshCreateLockAvailability()
+  }
 }
 
 function attachMyLocksHandlers(): void {

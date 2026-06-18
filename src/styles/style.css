@@ -791,6 +791,150 @@ body {
   color: #666666;
 }
 
+.lock-mode-fieldset {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.lock-mode-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lock-mode-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid rgba(216, 111, 0, 0.22);
+  border-radius: 999px;
+  background: #fffaf5;
+  font-size: 14px;
+  font-weight: 700;
+  color: #444444;
+  cursor: pointer;
+}
+
+.lock-mode-option:has(input:checked) {
+  border-color: rgba(216, 111, 0, 0.45);
+  background: rgba(255, 179, 71, 0.18);
+  color: #9a4d00;
+}
+
+.lock-mode-option input {
+  accent-color: #d86f00;
+}
+
+.compact-info-note--split {
+  margin-bottom: 14px;
+}
+
+.split-lock-preview-dialog {
+  max-width: 42rem;
+}
+
+.split-lock-preview-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 14px;
+}
+
+.split-lock-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.split-lock-preview-table th,
+.split-lock-preview-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(216, 111, 0, 0.12);
+  text-align: left;
+  vertical-align: top;
+}
+
+.split-lock-preview-table th {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #888888;
+}
+
+.split-lock-preview-warning {
+  margin: 0 0 14px;
+}
+
+.split-lock-progress-dialog {
+  max-width: 36rem;
+}
+
+.split-lock-progress-list {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.split-lock-progress-item {
+  padding: 12px 14px;
+  border: 1px solid rgba(216, 111, 0, 0.14);
+  border-radius: 14px;
+  background: #fffaf5;
+  display: grid;
+  gap: 6px;
+}
+
+.split-lock-progress-item--active {
+  border-color: rgba(216, 111, 0, 0.35);
+  background: rgba(255, 179, 71, 0.12);
+}
+
+.split-lock-progress-item--success {
+  border-color: rgba(21, 128, 61, 0.2);
+}
+
+.split-lock-progress-item--failed {
+  border-color: rgba(180, 35, 24, 0.22);
+  background: #fffaf5;
+}
+
+.split-lock-progress-item__main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.split-lock-progress-item__index {
+  font-weight: 800;
+  color: #9a4d00;
+}
+
+.split-lock-progress-item__meta {
+  font-size: 13px;
+  color: #555555;
+}
+
+.split-lock-progress-item__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #444444;
+}
+
+.split-lock-progress-item__error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #b42318;
+}
+
 .amount-shortcuts {
   display: grid;
   gap: 8px;
