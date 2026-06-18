@@ -1,4 +1,5 @@
 import type { SolanaNetwork } from '../solana/config'
+import { DEFAULT_SOLANA_NETWORK } from '../solana/config'
 import { isRpcRateLimitError } from '../solana/rpcFetch'
 import { checkProgramDeployed, type ProgramDeploymentStatus } from '../solana/programStatus'
 import { withRpcCallSource } from './rpcCallTracker'
@@ -9,7 +10,7 @@ const PROGRAM_STATUS_CACHE_MS = 5 * 60 * 1000
 type ProgramStatusListener = (status: ProgramDeploymentStatus) => void
 
 let currentStatus: ProgramDeploymentStatus = {
-  cluster: 'devnet',
+  cluster: DEFAULT_SOLANA_NETWORK,
   deployed: false,
   statusKnown: false,
   checkedAt: null,

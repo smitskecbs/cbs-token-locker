@@ -6,8 +6,10 @@ Open-source Solana program for verifiable SPL and LP token locks.
 
 | Cluster | Program ID |
 |---|---|
-| Localnet / Devnet (current) | `DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU` |
-| Mainnet | Deployed via governed release. Set `VITE_CBS_LOCKER_PROGRAM_ID` after deployment. |
+| Devnet | `DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU` |
+| Mainnet | `DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU` |
+
+Authority: `8Y7wEBB15f8mpQ7H5Wa1pVdo1TNSg2KE7rLKApHUk5Zd`
 
 ## Design Goals
 

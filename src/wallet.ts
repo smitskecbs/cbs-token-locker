@@ -7,11 +7,15 @@ import {
   getSolanaChainId,
   type SolanaNetwork,
 } from './solana/config'
+import { isWalletUserRejection } from './solana/walletSendErrors'
 import { getWalletStandardWallets } from './solana/walletStandard'
 import {
   createInjectedWalletSerializeWrapper,
   type InjectedWalletSerializeWrapper,
 } from './solana/transactionWire'
+
+const BACKPACK_OPEN_EXTENSION_MESSAGE =
+  'Please open the Backpack extension and try again.'
 
 export type SolanaWalletProvider = {
   connect?: (options?: { onlyIfTrusted?: boolean }) => Promise<{
@@ -507,6 +511,48 @@ function normalizeWalletName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+export function isBackpackWallet(wallet: DetectedWallet): boolean {
+  return (
+    normalizeWalletName(wallet.name) === 'backpack' ||
+    wallet.id === 'backpack' ||
+    wallet.id.startsWith('ws-backpack')
+  )
+}
+
+export function isBackpackExtensionInstalled(): boolean {
+  return Boolean(window.backpack) || Boolean(window.solana?.isBackpack)
+}
+
+export function isBackpackInstalledButInactive(
+  wallet: DetectedWallet,
+  connectError?: unknown,
+): boolean {
+  if (!isBackpackWallet(wallet) || !isBackpackExtensionInstalled()) {
+    return false
+  }
+
+  if (connectError === undefined) {
+    return true
+  }
+
+  return !isWalletUserRejection(connectError)
+}
+
+function resolveWalletConnectErrorMessage(
+  wallet: DetectedWallet,
+  error: unknown,
+): string {
+  if (!isBackpackWallet(wallet)) {
+    return error instanceof Error ? error.message : 'Unable to connect wallet.'
+  }
+
+  if (isWalletUserRejection(error)) {
+    return 'Connection cancelled.'
+  }
+
+  return BACKPACK_OPEN_EXTENSION_MESSAGE
+}
+
 function getWalletSourcePriority(wallet: DetectedWallet): number {
   if (wallet.source === 'wallet-standard') {
     return 0
@@ -819,13 +865,20 @@ export async function connectWallet(walletId: string): Promise<WalletConnectionS
       errorMessage: null,
     }
   } catch (error) {
+    if (isDebugPanelVisible() && isBackpackWallet(wallet)) {
+      console.log('[wallet] Backpack connection failed:', {
+        extensionInstalled: isBackpackExtensionInstalled(),
+        installedButInactive: isBackpackInstalledButInactive(wallet, error),
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+
     connectionState = {
       status: 'error',
       walletId,
       walletName: wallet.name,
       address: null,
-      errorMessage:
-        error instanceof Error ? error.message : 'Unable to connect wallet.',
+      errorMessage: resolveWalletConnectErrorMessage(wallet, error),
     }
   }
 

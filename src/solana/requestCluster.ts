@@ -1,4 +1,5 @@
 import type { SolanaNetwork } from './config'
+import { DEFAULT_SOLANA_NETWORK } from './config'
 
 export function parseRequestCluster(value: string | null | undefined): SolanaNetwork | null {
   const normalized = value?.trim().toLowerCase()
@@ -15,5 +16,5 @@ export function parseRequestCluster(value: string | null | undefined): SolanaNet
 }
 
 export function parseRequestClusterOrDefault(value: string | null | undefined): SolanaNetwork {
-  return parseRequestCluster(value) ?? 'devnet'
+  return parseRequestCluster(value) ?? DEFAULT_SOLANA_NETWORK
 }

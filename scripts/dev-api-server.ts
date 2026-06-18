@@ -46,5 +46,5 @@ createServer((request, response) => {
   logApiRpcConfiguration()
   console.log(`CBS Token Locker API listening on http://localhost:${PORT}`)
   console.log(`Program ID: ${CBS_LOCKER_PROGRAM_ID}`)
-  console.log('API cluster param: cluster=devnet | cluster=mainnet (defaults to devnet)')
+  console.log('API cluster param: cluster=devnet | cluster=mainnet (defaults to mainnet)')
 })

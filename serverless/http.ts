@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 import { invalidClusterResponse } from './apiErrors.js'
-import { parseRequestCluster, type SolanaNetwork } from './cluster.js'
+import { DEFAULT_CLUSTER, parseRequestCluster, type SolanaNetwork } from './cluster.js'
 
 export function setCors(response: VercelResponse): void {
   response.setHeader('Access-Control-Allow-Origin', '*')
@@ -22,7 +22,7 @@ export function resolveCluster(
   const rawCluster = url.searchParams.get('cluster')
 
   if (rawCluster === null || rawCluster.trim() === '') {
-    return { cluster: 'devnet' }
+    return { cluster: DEFAULT_CLUSTER }
   }
 
   const parsed = parseRequestCluster(rawCluster)

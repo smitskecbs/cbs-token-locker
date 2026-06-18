@@ -40,9 +40,9 @@ CBS Token Locker lets project teams lock tokens on Solana with transparent, publ
 
 ## Program ID
 
-`DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU` (devnet deployment)
+`DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU` (Devnet and Mainnet)
 
-Mainnet deployment is **not active** until the program is deployed on Mainnet and verified in the app.
+Production defaults to **Mainnet**. Devnet remains available via the in-app network selector.
 
 See [docs/PROGRAM.md](docs/PROGRAM.md) for account layout, PDA seeds, and deployment notes.
 
@@ -63,20 +63,19 @@ npm run dev
 
 Set the cluster selector to **Devnet**, confirm the CBS Locker Program is deployed, then create and unlock locks with a funded devnet wallet.
 
-## Mainnet setup
+## Mainnet (production)
 
-Mainnet is supported in the UI and API, but the CBS Locker Program is **not deployed on Mainnet yet**.
+Mainnet is the **default network** for production builds (`VITE_SOLANA_NETWORK=mainnet`).
 
-Before using Mainnet:
+Before a Mainnet smoke test:
 
-1. Deploy the Anchor program to Mainnet (see `docs/PROGRAM.md`).
-2. Configure Mainnet RPC credentials in `.env` (see below).
-3. Set the in-app network selector to **Mainnet**.
-4. Confirm the app reports program status for Mainnet (not Devnet).
+1. Set Mainnet RPC credentials in Vercel (see below).
+2. Redeploy so `VITE_SOLANA_RPC_MAINNET` is baked into the browser bundle.
+3. Open locker.cbs-coin.com — **Mainnet** should be selected by default.
+4. Confirm program status shows deployed on Mainnet.
+5. Connect Phantom, Solflare, or Backpack on **Mainnet** and test a small create/unlock.
 
-When Mainnet is selected but the program is not deployed, the app shows:
-
-> CBS Locker Program is not deployed on Mainnet yet.
+Devnet remains available via the network selector for testing.
 
 ## Phantom wallet support
 
@@ -86,7 +85,7 @@ CBS Token Locker supports injected wallets (including Phantom) and Wallet Standa
 - **Wallet Standard wallets:** may use `signAndSendTransaction` when available
 - Connect, disconnect, and transaction approval flows are handled in-app
 
-Use a wallet funded on devnet for testing. Switch Phantom to Devnet before creating or unlocking locks.
+Use a wallet funded on the selected network. Switch your wallet to **Mainnet** (or Devnet) to match the in-app network selector before creating or unlocking locks.
 
 ## Local RPC configuration
 
@@ -103,7 +102,7 @@ Optional overrides:
 
 - `VITE_HELIUS_DEVNET_RPC` — full Helius Devnet RPC URL
 - `VITE_HELIUS_MAINNET_RPC` — full Helius Mainnet RPC URL
-- `VITE_SOLANA_NETWORK` — default network when no cluster is stored (`devnet` or `mainnet`)
+- `VITE_SOLANA_NETWORK` — default network when no cluster is stored (`mainnet` or `devnet`)
 
 Restart both the API and frontend after changing env values:
 
@@ -132,7 +131,7 @@ npm run dev
 
 All API endpoints accept a `cluster` query parameter: `cluster=devnet` or `cluster=mainnet`.
 
-- If `cluster` is omitted, the API defaults to **devnet**.
+- If `cluster` is omitted, the API defaults to **mainnet**.
 - Invalid cluster values return HTTP 400.
 - The frontend always sends the selected network as `cluster`.
 
@@ -143,7 +142,7 @@ All API endpoints accept a `cluster` query parameter: `cluster=devnet` or `clust
 | `GET /api/v1/locks?owner=&cluster=` | List locks for a wallet |
 | `GET /api/v1/locks?q=&field=&cluster=` | Search on-chain locks |
 
-## Vercel deployment (Devnet)
+## Vercel deployment (Mainnet production)
 
 The frontend builds with Vite (`dist/`) and the Lock API runs as Vercel serverless functions at `/api/v1/*`. SPA routes (`/lock/...`, `/locks`) rewrite to `index.html`.
 
@@ -151,9 +150,11 @@ The frontend builds with Vite (`dist/`) and the Lock API runs as Vercel serverle
 
 | Variable | Scope | Purpose |
 |---|---|---|
-| `VITE_SOLANA_NETWORK` | Build | Default network (`devnet`) |
-| `VITE_SOLANA_RPC_DEVNET` | Build | Browser RPC for create/unlock on Devnet |
-| `HELIUS_DEVNET_API_KEY` | Runtime (API) | Helius RPC for serverless Lock API |
+| `VITE_SOLANA_NETWORK` | Build | Default network (`mainnet`) |
+| `VITE_SOLANA_RPC_MAINNET` | Build | Browser RPC for create/unlock on Mainnet |
+| `HELIUS_MAINNET_API_KEY` | Runtime (API) | Helius RPC for serverless Lock API on Mainnet |
+| `HELIUS_DEVNET_API_KEY` | Runtime (API) | Helius RPC when users switch to Devnet |
+| `VITE_SOLANA_RPC_DEVNET` | Build | Browser RPC when users switch to Devnet |
 
 Set `VITE_LOCK_API_BASE=/api/v1` only if the API is hosted on a different origin.
 
@@ -161,12 +162,11 @@ Set `VITE_LOCK_API_BASE=/api/v1` only if the API is hosted on a different origin
 
 1. Push the repo to GitHub and import the project in [Vercel](https://vercel.com/new).
 2. Framework preset: **Vite** (or Other — `vercel.json` sets build/output).
-3. Add the three required env vars above for **Production** (and Preview if desired).
+3. Add the required env vars above for **Production** (and Preview if desired).
 4. Deploy. Vercel runs `npm run build` and serves `dist/` plus serverless routes in `api/v1/`.
-5. Open the deployment URL, confirm **Devnet** is selected, and the program status shows deployed.
-6. Switch to **Mainnet** — status should read *not deployed* and Create Lock stays disabled.
-
-Mainnet program deployment is **not** part of this setup. Do not add Mainnet RPC keys until the program is deployed on Mainnet.
+5. Open locker.cbs-coin.com, confirm **Mainnet** is selected, and program status shows deployed.
+6. Run a small Mainnet smoke test (connect wallet, create lock, unlock after timestamp).
+7. Switch to **Devnet** to confirm optional devnet testing still works.
 
 ## User flow
 

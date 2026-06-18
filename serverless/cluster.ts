@@ -1,5 +1,7 @@
 export type SolanaNetwork = 'devnet' | 'mainnet'
 
+export const DEFAULT_CLUSTER: SolanaNetwork = 'mainnet'
+
 export function parseRequestCluster(value: string | null | undefined): SolanaNetwork | null {
   const normalized = value?.trim().toLowerCase()
 

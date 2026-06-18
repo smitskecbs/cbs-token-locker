@@ -11,9 +11,8 @@ import {
 import { fetchLocksByOwner, searchOnChainLocks } from './lockService.ts'
 import { fetchOnChainLock } from './fetchLock.ts'
 import { logApiRequestCluster } from './rpcConfig.ts'
-import type { SolanaNetwork } from './cluster.ts'
+import { DEFAULT_CLUSTER, parseRequestCluster, type SolanaNetwork } from './cluster.ts'
 import { CBS_LOCKER_PROGRAM_ID } from './constants.ts'
-import { parseRequestCluster } from './cluster.ts'
 import type { LockSearchField } from './types.ts'
 
 const REPOSITORY_URL =
@@ -64,7 +63,7 @@ function resolveRequestCluster(
   const rawCluster = url.searchParams.get('cluster')
 
   if (rawCluster === null || rawCluster.trim() === '') {
-    return { cluster: 'devnet' }
+    return { cluster: DEFAULT_CLUSTER }
   }
 
   const parsed = parseRequestCluster(rawCluster)

@@ -1,5 +1,7 @@
 export type SolanaNetwork = 'devnet' | 'mainnet'
 
+export const DEFAULT_SOLANA_NETWORK: SolanaNetwork = 'mainnet'
+
 export type RpcSource = 'custom' | 'helius-api-key' | 'helius' | 'public'
 
 export type RpcConfiguration = {
@@ -38,7 +40,7 @@ export function getDefaultNetwork(): SolanaNetwork {
     return configured
   }
 
-  return 'devnet'
+  return DEFAULT_SOLANA_NETWORK
 }
 
 export function buildHeliusDevnetRpcUrl(apiKey: string): string {

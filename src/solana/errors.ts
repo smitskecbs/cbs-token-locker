@@ -7,7 +7,7 @@ import { RPC_RATE_LIMIT_MESSAGE } from '../state/rpcActivityStore'
 import { isRpcRateLimitError } from './rpcFetch'
 
 const PROGRAM_NOT_DEPLOYED_MESSAGE =
-  'CBS Locker Program is not deployed on this cluster yet. Deploy the program to devnet before creating a test lock.'
+  'CBS Locker Program is not deployed on this cluster yet.'
 
 export function getProgramNotDeployedMessage(cluster: string): string {
   return `CBS Locker Program is not deployed on ${cluster} yet.`
