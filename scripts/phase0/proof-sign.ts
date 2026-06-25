@@ -4,15 +4,12 @@ import {
   createTransactionMessage,
   pipe,
   sendAndConfirmTransactionFactory,
+  setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
   type Instruction,
 } from '@solana/kit'
 import type { Signature } from '@solana/keys'
-import {
-  setTransactionMessageFeePayerSigner,
-  signTransactionMessageWithSigners,
-  type KeyPairSigner,
-} from '@solana/signers'
+import { signTransactionWithSigners, type KeyPairSigner } from '@solana/signers'
 import type { Blockhash } from '@solana/rpc-types'
 import type { TransactionWithLastValidBlockHeight } from '@solana/transaction-confirmation'
 import {
@@ -79,7 +76,7 @@ function buildPhase0TransactionMessage(input: {
 }) {
   return pipe(
     createTransactionMessage({ version: WALLET_TRANSACTION_MESSAGE_VERSION }),
-    (message) => setTransactionMessageFeePayerSigner(input.signer, message),
+    (message) => setTransactionMessageFeePayer(input.signer.address, message),
     (message) =>
       setTransactionMessageLifetimeUsingBlockhash(
         {
@@ -111,8 +108,10 @@ export async function compilePhase0Transaction(input: {
 
 export async function signPhase0TransactionMessage(
   transactionMessage: Phase0CompiledTransaction['transactionMessage'],
+  signer: KeyPairSigner,
 ) {
-  return signTransactionMessageWithSigners(transactionMessage)
+  const unsignedTransaction = compileTransaction(transactionMessage)
+  return signTransactionWithSigners([signer], unsignedTransaction)
 }
 
 export async function signAndSendPhase0Instructions(
@@ -121,7 +120,7 @@ export async function signAndSendPhase0Instructions(
 ): Promise<{ signature: Signature }> {
   const signer = await loadPhase0Signer()
   const { transactionMessage } = await compilePhase0Transaction({ signer, instructions })
-  const signedTransaction = await signTransactionMessageWithSigners(transactionMessage)
+  const signedTransaction = await signPhase0TransactionMessage(transactionMessage, signer)
   assertIsTransactionWithBlockhashLifetime(signedTransaction)
   const signature = getSignatureFromTransaction(signedTransaction)
 
