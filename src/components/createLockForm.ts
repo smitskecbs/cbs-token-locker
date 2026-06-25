@@ -146,7 +146,9 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
   }
 
   if (clmmNote) {
-    clmmNote.hidden = !isClmm || isClmmLockingEnabled()
+    const showClmmDisabledNote = isClmm && !isClmmLockingEnabled()
+    clmmNote.hidden = !showClmmDisabledNote
+    clmmNote.style.display = showClmmDisabledNote ? '' : 'none'
   }
 
   if (pickerHost) {

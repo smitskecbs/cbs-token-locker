@@ -5,11 +5,11 @@ anchor_version = "0.31.1"
 resolution = true
 skip-lint = false
 
-[programs.localnet]
-cbs_token_locker = "DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU"
-
 [programs.devnet]
-cbs_token_locker = "DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU"
+cbs_token_locker = "Hcgw5545Q4prhCE8HgNaJtMKGqPkC64aek1aRbTdXW1u"
+
+[programs.localnet]
+cbs_token_locker = "Hcgw5545Q4prhCE8HgNaJtMKGqPkC64aek1aRbTdXW1u"
 
 [programs.mainnet]
 cbs_token_locker = "DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU"

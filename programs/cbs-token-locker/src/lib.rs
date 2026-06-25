@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, Transfer};
 
-declare_id!("DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU");
+declare_id!("Hcgw5545Q4prhCE8HgNaJtMKGqPkC64aek1aRbTdXW1u");
 
 /// Maximum on-chain project name bytes stored for public verification.
 pub const MAX_PROJECT_NAME_LEN: usize = 48;
@@ -143,6 +143,9 @@ pub struct CreateLock<'info> {
     )]
     pub lock: Account<'info, TokenLock>,
 
+    #[account(
+        mint::token_program = token_program,
+    )]
     pub mint: InterfaceAccount<'info, Mint>,
 
     #[account(
