@@ -875,6 +875,21 @@ body {
   color: #6d28d9;
 }
 
+.compact-info-note--token-type {
+  margin-bottom: 14px;
+}
+
+.compact-info-note--clmm {
+  margin-bottom: 14px;
+  border-color: rgba(124, 58, 237, 0.2);
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.06), #ffffff 72%);
+}
+
+.compact-info-note__body--emphasis {
+  font-weight: 800;
+  color: #111111;
+}
+
 .compact-info-note {
   margin: 0 0 14px;
   padding: 12px 14px;

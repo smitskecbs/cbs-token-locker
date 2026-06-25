@@ -40,21 +40,54 @@ const LP_AMOUNT_HINT = 'Enter the LP token amount shown in your wallet, not raw 
 const SPLIT_TOTAL_LABEL = 'Total Amount'
 const SPLIT_TOTAL_HINT = 'Total tokens to split across all locks, not raw decimals.'
 
+export type FormTokenTypeSelect = 'spl' | 'lp' | 'clmm'
+
+const TOKEN_TYPE_EXPLANATIONS: Record<FormTokenTypeSelect, string> = {
+  spl: 'Lock normal SPL tokens held in your wallet. Common for team supply, reserves, treasury wallets, or airdrop allocations.',
+  lp: 'Use this when your liquidity position gives you normal SPL LP tokens. Locking LP tokens shows those tokens cannot be moved until the unlock date.',
+  clmm: 'Some concentrated liquidity pools, such as Raydium CLMM, represent liquidity as an NFT position instead of normal SPL LP tokens. These require a separate NFT lock flow.',
+}
+
+const TOKEN_TYPE_WARNING =
+  'Locking proves tokens or position assets are locked. It does not guarantee price, pool safety, trading volume, or project success.'
+
+export function readFormTokenTypeSelect(form?: HTMLFormElement | null): FormTokenTypeSelect {
+  const value = form ? String(new FormData(form).get('tokenType') ?? 'spl') : 'spl'
+
+  if (value === 'lp') {
+    return 'lp'
+  }
+
+  if (value === 'clmm') {
+    return 'clmm'
+  }
+
+  return 'spl'
+}
+
+/** On-chain token type for create lock — CLMM is UI-only and must never be submitted. */
+export function readCreateLockTokenType(form?: HTMLFormElement | null): 'spl' | 'lp' {
+  return readFormTokenTypeSelect(form) === 'lp' ? 'lp' : 'spl'
+}
+
 export function readLockMode(form?: HTMLFormElement | null): LockMode {
   const selected = form?.querySelector<HTMLInputElement>('input[name="lockMode"]:checked')
 
   return selected?.value === 'split' ? 'split' : 'single'
 }
 
-export function syncCreateLockTokenTypeUi(tokenType: 'spl' | 'lp' = 'spl'): void {
+export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'): void {
   const isLp = tokenType === 'lp'
+  const isClmm = tokenType === 'clmm'
   const isSplit = readLockMode() === 'split'
 
   const mintLabel = document.querySelector<HTMLElement>('#tokenMintLabel')
   const mintHint = document.querySelector<HTMLElement>('#tokenMintHint')
   const amountLabel = document.querySelector<HTMLElement>('#amountLabel')
   const amountHint = document.querySelector<HTMLElement>('#amountHint')
-  const lpNote = document.querySelector<HTMLElement>('#lpTokenTypeNote')
+  const explanationBody = document.querySelector<HTMLElement>('#tokenTypeExplanationBody')
+  const classificationNote = document.querySelector<HTMLElement>('#tokenClassificationNote')
+  const clmmNote = document.querySelector<HTMLElement>('#clmmComingSoonNote')
 
   if (mintLabel) {
     mintLabel.textContent = isLp ? LP_MINT_LABEL : SPL_MINT_LABEL
@@ -80,8 +113,16 @@ export function syncCreateLockTokenTypeUi(tokenType: 'spl' | 'lp' = 'spl'): void
         : SPL_AMOUNT_HINT
   }
 
-  if (lpNote) {
-    lpNote.hidden = !isLp
+  if (explanationBody) {
+    explanationBody.textContent = TOKEN_TYPE_EXPLANATIONS[tokenType]
+  }
+
+  if (classificationNote) {
+    classificationNote.hidden = isClmm
+  }
+
+  if (clmmNote) {
+    clmmNote.hidden = !isClmm
   }
 }
 
@@ -91,7 +132,6 @@ export function syncCreateLockModeUi(mode: LockMode = readLockMode()): void {
   const splitSection = document.querySelector<HTMLElement>('#splitLockSection')
   const splitWarning = document.querySelector<HTMLElement>('#splitLockWarning')
   const submitButton = document.querySelector<HTMLButtonElement>('#createLockBtn')
-  const tokenTypeSelect = document.querySelector<HTMLSelectElement>('#tokenType')
 
   if (singleSection) {
     singleSection.hidden = isSplit
@@ -109,12 +149,10 @@ export function syncCreateLockModeUi(mode: LockMode = readLockMode()): void {
     submitButton.textContent = isSplit ? 'Review Split Schedule' : 'Create Lock'
   }
 
-  syncCreateLockTokenTypeUi(
-    tokenTypeSelect?.value === 'lp' ? 'lp' : 'spl',
-  )
+  syncCreateLockTokenTypeUi(readFormTokenTypeSelect())
 }
 
-export function attachCreateLockTokenTypeUi(): void {
+export function attachCreateLockTokenTypeUi(onChange?: () => void): void {
   const select = document.querySelector<HTMLSelectElement>('#tokenType')
 
   if (!select) {
@@ -122,7 +160,8 @@ export function attachCreateLockTokenTypeUi(): void {
   }
 
   const syncFromSelect = () => {
-    syncCreateLockTokenTypeUi(select.value === 'lp' ? 'lp' : 'spl')
+    syncCreateLockTokenTypeUi(readFormTokenTypeSelect())
+    onChange?.()
   }
 
   syncFromSelect()
@@ -197,9 +236,10 @@ export function renderCreateLockForm(): string {
           <span class="field-label">Token type</span>
           <select class="field-input field-select" name="tokenType" id="tokenType">
             <option value="spl">SPL Token</option>
-            <option value="lp">LP Token</option>
+            <option value="lp">LP Token (standard AMM)</option>
+            <option value="clmm">CLMM Position NFT</option>
           </select>
-          <span class="field-hint">Choose SPL Token or LP Token.</span>
+          <span class="field-hint">Choose SPL Token, LP Token (standard AMM), or CLMM Position NFT.</span>
         </label>
 
         <label class="field field--amount">
@@ -228,14 +268,22 @@ export function renderCreateLockForm(): string {
         </label>
       </div>
 
-      <div class="compact-info-note compact-info-note--lp" id="lpTokenTypeNote" hidden>
-        <p class="compact-info-note__body">
-          LP tokens represent a liquidity position. Locking LP tokens can show that liquidity is
-          committed until the unlock date.
+      <div class="compact-info-note compact-info-note--token-type" id="tokenTypeExplanation">
+        <p class="compact-info-note__body" id="tokenTypeExplanationBody">
+          ${TOKEN_TYPE_EXPLANATIONS.spl}
         </p>
         <p class="compact-info-note__warning">
-          LP locking is proof that the LP tokens are locked. It does not guarantee token price,
-          pool safety, trading volume or project success.
+          ${TOKEN_TYPE_WARNING}
+        </p>
+      </div>
+
+      <div class="compact-info-note compact-info-note--clmm" id="clmmComingSoonNote" hidden>
+        <p class="compact-info-note__body compact-info-note__body--emphasis">
+          CLMM Position NFT locking is coming soon.
+        </p>
+        <p class="compact-info-note__body">
+          This option is not available yet. Use LP Token (standard AMM) if your position appears as
+          normal SPL LP tokens in your wallet.
         </p>
       </div>
 
@@ -332,7 +380,7 @@ export function renderCreateLockForm(): string {
         </p>
       </div>
 
-      <p class="form-classification-note">
+      <p class="form-classification-note" id="tokenClassificationNote">
         SPL and LP tokens use the same on-chain vault. The token type you choose is saved as a
         label with your lock.
       </p>

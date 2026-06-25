@@ -42,7 +42,7 @@ import {
 } from '../state/debugStore'
 import { copyTextToClipboard } from '../utils/copyText'
 import { getProgramStatus, refreshProgramStatus, subscribeToProgramStatus } from '../state/programStore'
-import type { CreateLockInput, LockRecord, LockSearchField, PreviewLock, TokenType } from '../types/lock'
+import type { CreateLockInput, LockRecord, LockSearchField, PreviewLock } from '../types/lock'
 import { readCreateLockFormState } from '../utils/formValidation'
 import { formatUserFacingLockError } from '../utils/lockUiErrors'
 import { registerHomeTabActivator } from '../utils/lockDetailNavigation'
@@ -62,7 +62,7 @@ import {
 } from '../wallet'
 import { renderClusterAdvancedDetails, renderWalletNetworkSection } from '../components/clusterPanel'
 import { renderDebugPanel } from '../components/debugPanel'
-import { attachCreateLockModeUi, attachCreateLockTokenTypeUi, readLockMode } from '../components/createLockForm'
+import { attachCreateLockModeUi, attachCreateLockTokenTypeUi, readCreateLockTokenType, readLockMode } from '../components/createLockForm'
 import { renderLockPreviewModal } from '../components/lockPreviewModal'
 import { renderSplitLockPreviewModal } from '../components/splitLockPreviewModal'
 import { attachCreateLockAmountShortcuts } from '../utils/createLockAmountShortcuts'
@@ -839,7 +839,7 @@ function readSplitLockInput(form: HTMLFormElement): SplitLockInput {
     projectName: String(formData.get('projectName') ?? ''),
     projectDescription: String(formData.get('projectDescription') ?? ''),
     tokenMint: String(formData.get('tokenMint') ?? ''),
-    tokenType: String(formData.get('tokenType') ?? 'spl') as TokenType,
+    tokenType: readCreateLockTokenType(form),
     totalAmount: String(formData.get('amount') ?? ''),
     unlockCount: Number(formData.get('splitUnlockCount') ?? ''),
     interval: (interval === 'monthly' ? 'monthly' : 'yearly') as SplitLockInterval,
@@ -856,7 +856,7 @@ function readCreateLockInput(form: HTMLFormElement): CreateLockInput {
   return {
     projectName: String(formData.get('projectName') ?? ''),
     tokenMint: String(formData.get('tokenMint') ?? ''),
-    tokenType: String(formData.get('tokenType') ?? 'spl') as TokenType,
+    tokenType: readCreateLockTokenType(form),
     amount: String(formData.get('amount') ?? ''),
     unlockDate: String(formData.get('unlockDate') ?? ''),
     unlockTime: String(formData.get('unlockTime') ?? ''),
@@ -1148,7 +1148,10 @@ function openLockPreviewModal(preview: PreviewLock): void {
 }
 
 function attachCreateLockHandlers(): void {
-  attachCreateLockTokenTypeUi()
+  attachCreateLockTokenTypeUi(() => {
+    clearCreateLockError()
+    refreshCreateLockAvailability()
+  })
   attachCreateLockModeUi(() => {
     clearCreateLockError()
     refreshCreateLockAvailability()

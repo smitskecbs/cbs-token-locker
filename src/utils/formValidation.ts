@@ -1,5 +1,5 @@
 import { isValidSolanaAddress } from '../locker'
-import { readLockMode } from '../components/createLockForm'
+import { readLockMode, readFormTokenTypeSelect } from '../components/createLockForm'
 import { getSelectedNetwork } from '../solana/cluster'
 import { getProgramStatus } from '../state/programStore'
 import type { LockMode } from '../types/splitLock'
@@ -20,6 +20,7 @@ export type CreateLockFormState = {
   amountValid: boolean
   unlockDateValid: boolean
   splitUnlockCountValid: boolean
+  clmmSelected: boolean
   canPreview: boolean
   canCreate: boolean
   disableReasons: string[]
@@ -32,6 +33,8 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
   const programStatusMatchesNetwork = programStatus.cluster === selectedNetwork
   const formData = form ? new FormData(form) : null
   const lockMode = readLockMode(form)
+  const tokenTypeSelect = readFormTokenTypeSelect(form)
+  const clmmSelected = tokenTypeSelect === 'clmm'
 
   const projectName = String(formData?.get('projectName') ?? '').trim()
   const tokenMint = String(formData?.get('tokenMint') ?? '').trim()
@@ -123,13 +126,18 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
     disableReasons.push('Acknowledge the safety notice.')
   }
 
+  if (clmmSelected) {
+    disableReasons.push('CLMM Position NFT locking is coming soon.')
+  }
+
   const formValid =
     projectNameValid &&
     mintValid &&
     amountValid &&
     unlockDateValid &&
     splitUnlockCountValid &&
-    safetyChecked
+    safetyChecked &&
+    !clmmSelected
 
   const canPreview = walletConnected && formValid
   const canCreate = canPreview && programDeployed
@@ -144,6 +152,7 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
     amountValid,
     unlockDateValid,
     splitUnlockCountValid,
+    clmmSelected,
     canPreview,
     canCreate,
     disableReasons,
