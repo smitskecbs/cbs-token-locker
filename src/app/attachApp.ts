@@ -62,7 +62,7 @@ import {
 } from '../wallet'
 import { renderClusterAdvancedDetails, renderWalletNetworkSection } from '../components/clusterPanel'
 import { renderDebugPanel } from '../components/debugPanel'
-import { attachClmmPositionPicker, syncClmmPositionPickerVisibility } from '../components/clmmPositionPicker'
+import { attachClmmPositionPicker, getSelectedClmmPosition, syncClmmPositionPickerVisibility } from '../components/clmmPositionPicker'
 import { attachCreateLockModeUi, attachCreateLockTokenTypeUi, readCreateLockTokenType, readLockMode } from '../components/createLockForm'
 import { renderLockPreviewModal } from '../components/lockPreviewModal'
 import { renderSplitLockPreviewModal } from '../components/splitLockPreviewModal'
@@ -853,12 +853,15 @@ function readSplitLockInput(form: HTMLFormElement): SplitLockInput {
 function readCreateLockInput(form: HTMLFormElement): CreateLockInput {
   const walletState = getWalletConnectionState()
   const formData = new FormData(form)
+  const tokenType = readCreateLockTokenType(form)
+  const clmmPosition = tokenType === 'clmm' ? getSelectedClmmPosition() : null
 
   return {
     projectName: String(formData.get('projectName') ?? ''),
     tokenMint: String(formData.get('tokenMint') ?? ''),
-    tokenType: readCreateLockTokenType(form),
-    amount: String(formData.get('amount') ?? ''),
+    tokenType,
+    tokenProgram: clmmPosition?.tokenProgramId,
+    amount: tokenType === 'clmm' ? '1' : String(formData.get('amount') ?? ''),
     unlockDate: String(formData.get('unlockDate') ?? ''),
     unlockTime: String(formData.get('unlockTime') ?? ''),
     projectDescription: String(formData.get('projectDescription') ?? ''),

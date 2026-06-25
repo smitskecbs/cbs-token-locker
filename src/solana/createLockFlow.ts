@@ -33,6 +33,7 @@ import {
   isTransactionSignedNotSubmittedError,
 } from './walletSendErrors'
 import { validateOwnerTokenBalance } from './tokenBalance'
+import { TOKEN_PROGRAM_ID } from './programId'
 import { combineUnlockDateTime } from '../utils/time'
 import { safeJsonStringify } from '../utils/safeSerialize'
 
@@ -86,7 +87,15 @@ export class CreateLockFlowError extends Error {
 }
 
 function tokenTypeToByte(tokenType: CreateLockInput['tokenType']): number {
-  return tokenType === 'lp' ? 1 : 0
+  if (tokenType === 'lp') {
+    return 1
+  }
+
+  if (tokenType === 'clmm') {
+    return 2
+  }
+
+  return 0
 }
 
 function deriveLockSeed(): bigint {
@@ -281,10 +290,13 @@ export async function runCreateLockFlow(input: {
 
     const mint = address(input.createInput.tokenMint.trim())
     const owner = address(input.createInput.lockerWallet)
+    const tokenProgram = address(input.createInput.tokenProgram?.trim() || TOKEN_PROGRAM_ID)
     const { rawAmount } = await validateOwnerTokenBalance({
       ownerAddress: input.createInput.lockerWallet,
       mintAddress: input.createInput.tokenMint.trim(),
       amount: input.createInput.amount,
+      tokenProgram: String(tokenProgram),
+      clmmLock: input.createInput.tokenType === 'clmm',
     })
 
     const lockSeed = deriveLockSeed()
@@ -297,6 +309,7 @@ export async function runCreateLockFlow(input: {
       lockSeed,
       tokenType: tokenTypeToByte(input.createInput.tokenType),
       projectName: input.createInput.projectName.trim().slice(0, 48),
+      tokenProgram,
     })
 
     debugOutput.lockAccount = plan.lockAccount

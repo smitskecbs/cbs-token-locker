@@ -30,13 +30,15 @@ export async function buildCreateLockInstructions(input: {
   lockSeed: bigint
   tokenType: number
   projectName: string
+  tokenProgram?: Address
 }): Promise<CreateLockInstructionPlan> {
+  const tokenProgram = input.tokenProgram ?? TOKEN_PROGRAM_ID
   const [lockAccount] = await findLockAccountAddress(input.owner, input.mint, input.lockSeed)
   const [vault] = await findVaultAddress(lockAccount)
   const [ownerTokenAccount] = await findAssociatedTokenPda({
     owner: input.owner,
     mint: input.mint,
-    tokenProgram: TOKEN_PROGRAM_ID,
+    tokenProgram,
   })
 
   const createAtaInstruction = getCreateAssociatedTokenIdempotentInstruction({
@@ -44,7 +46,7 @@ export async function buildCreateLockInstructions(input: {
     ata: ownerTokenAccount,
     owner: input.owner,
     mint: input.mint,
-    tokenProgram: TOKEN_PROGRAM_ID,
+    tokenProgram,
   })
 
   const createLockData = encodeCreateLockArgs(
@@ -63,7 +65,7 @@ export async function buildCreateLockInstructions(input: {
       { address: input.mint, role: AccountRole.READONLY },
       { address: vault, role: AccountRole.WRITABLE },
       { address: ownerTokenAccount, role: AccountRole.WRITABLE },
-      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: tokenProgram, role: AccountRole.READONLY },
       { address: ASSOCIATED_TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       { address: SYSTEM_PROGRAM_ID, role: AccountRole.READONLY },
     ],

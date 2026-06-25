@@ -18,9 +18,14 @@ export type OwnerTokenBalanceFetchResult =
       kind: 'load_failed'
     }
 
+function resolveTokenProgram(tokenProgram?: string) {
+  return address(tokenProgram?.trim() || TOKEN_PROGRAM_ID)
+}
+
 export async function fetchOwnerTokenBalance(input: {
   ownerAddress: string
   mintAddress: string
+  tokenProgram?: string
 }): Promise<OwnerTokenBalanceFetchResult> {
   try {
     assertIsAddress(input.ownerAddress)
@@ -33,6 +38,7 @@ export async function fetchOwnerTokenBalance(input: {
     const rpc = getSolanaRpc()
     const owner = address(input.ownerAddress)
     const mint = address(input.mintAddress)
+    const tokenProgram = resolveTokenProgram(input.tokenProgram)
     const mintAccount = await fetchMaybeMint(rpc, mint)
 
     if (!mintAccount.exists) {
@@ -42,7 +48,7 @@ export async function fetchOwnerTokenBalance(input: {
     const [ownerTokenAccount] = await findAssociatedTokenPda({
       owner,
       mint,
-      tokenProgram: TOKEN_PROGRAM_ID,
+      tokenProgram,
     })
 
     const tokenAccount = await fetchMaybeToken(rpc, ownerTokenAccount)
@@ -58,10 +64,45 @@ export async function fetchOwnerTokenBalance(input: {
   }
 }
 
+async function validateClmmOwnerBalance(input: {
+  ownerAddress: string
+  mintAddress: string
+  tokenProgram?: string
+}): Promise<{ rawAmount: bigint; decimals: number }> {
+  const rpc = getSolanaRpc()
+  const owner = address(input.ownerAddress)
+  const mint = address(input.mintAddress)
+  const tokenProgram = resolveTokenProgram(input.tokenProgram)
+  const [ownerTokenAccount] = await findAssociatedTokenPda({
+    owner,
+    mint,
+    tokenProgram,
+  })
+
+  const balance = await rpc
+    .getTokenAccountBalance(ownerTokenAccount, { commitment: 'confirmed' })
+    .send()
+
+  const rawBalance = BigInt(balance.value.amount)
+
+  if (rawBalance < 1n) {
+    throw new OnChainLockerError(
+      'CLMM position NFT not found for this wallet and mint on the selected cluster.',
+    )
+  }
+
+  return {
+    rawAmount: 1n,
+    decimals: balance.value.decimals,
+  }
+}
+
 export async function validateOwnerTokenBalance(input: {
   ownerAddress: string
   mintAddress: string
   amount: string
+  tokenProgram?: string
+  clmmLock?: boolean
 }): Promise<{ rawAmount: bigint; decimals: number }> {
   try {
     assertIsAddress(input.ownerAddress)
@@ -70,9 +111,24 @@ export async function validateOwnerTokenBalance(input: {
     throw new OnChainLockerError('Invalid mint address.')
   }
 
+  if (input.clmmLock) {
+    const numericAmount = Number(input.amount.replaceAll(',', '').trim())
+
+    if (!Number.isFinite(numericAmount) || numericAmount !== 1) {
+      throw new OnChainLockerError('CLMM position locks must use amount 1.')
+    }
+
+    return validateClmmOwnerBalance({
+      ownerAddress: input.ownerAddress,
+      mintAddress: input.mintAddress,
+      tokenProgram: input.tokenProgram,
+    })
+  }
+
   const rpc = getSolanaRpc()
   const owner = address(input.ownerAddress)
   const mint = address(input.mintAddress)
+  const tokenProgram = resolveTokenProgram(input.tokenProgram)
   const mintAccount = await fetchMaybeMint(rpc, mint)
 
   if (!mintAccount.exists) {
@@ -91,7 +147,7 @@ export async function validateOwnerTokenBalance(input: {
   const [ownerTokenAccount] = await findAssociatedTokenPda({
     owner,
     mint,
-    tokenProgram: TOKEN_PROGRAM_ID,
+    tokenProgram,
   })
 
   const tokenAccount = await fetchMaybeToken(rpc, ownerTokenAccount)

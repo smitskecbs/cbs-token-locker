@@ -9,6 +9,10 @@ export function formatTokenType(tokenType: TokenType): string {
     return 'SPL Token'
   }
 
+  if (tokenType === 'clmm') {
+    return 'CLMM Position NFT'
+  }
+
   return 'Token'
 }
 
