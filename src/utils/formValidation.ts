@@ -1,5 +1,7 @@
+import { isClmmLockingEnabled } from '../config/featureFlags'
 import { isValidSolanaAddress } from '../locker'
 import { readLockMode, readFormTokenTypeSelect } from '../components/createLockForm'
+import { getSelectedClmmPosition } from '../components/clmmPositionPicker'
 import { getSelectedNetwork } from '../solana/cluster'
 import { getProgramStatus } from '../state/programStore'
 import type { LockMode } from '../types/splitLock'
@@ -35,6 +37,7 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
   const lockMode = readLockMode(form)
   const tokenTypeSelect = readFormTokenTypeSelect(form)
   const clmmSelected = tokenTypeSelect === 'clmm'
+  const selectedClmmPosition = clmmSelected ? getSelectedClmmPosition() : null
 
   const projectName = String(formData?.get('projectName') ?? '').trim()
   const tokenMint = String(formData?.get('tokenMint') ?? '').trim()
@@ -58,6 +61,11 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
   const mintValid = isValidSolanaAddress(tokenMint)
   const numericAmount = Number(amount.replaceAll(',', ''))
   const amountValid = Number.isFinite(numericAmount) && numericAmount > 0
+  const clmmPositionSelected = !clmmSelected || selectedClmmPosition !== null
+  const clmmSingleLockOnly = !clmmSelected || lockMode === 'single'
+  const clmmAmountValid = !clmmSelected || numericAmount === 1
+  const clmmLockingEnabled = isClmmLockingEnabled()
+  const clmmSubmitAllowed = !clmmSelected || clmmLockingEnabled
 
   let unlockDateValid = false
 
@@ -126,8 +134,20 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
     disableReasons.push('Acknowledge the safety notice.')
   }
 
-  if (clmmSelected) {
-    disableReasons.push('CLMM Position NFT locking is coming soon.')
+  if (clmmSelected && lockMode === 'split') {
+    disableReasons.push('CLMM position locks support single-lock mode only.')
+  }
+
+  if (clmmSelected && !selectedClmmPosition) {
+    disableReasons.push('Select a CLMM position from your wallet.')
+  }
+
+  if (clmmSelected && !clmmAmountValid) {
+    disableReasons.push('CLMM position locks must use amount 1.')
+  }
+
+  if (clmmSelected && !clmmLockingEnabled) {
+    disableReasons.push('CLMM locking is detected and prepared, but not enabled yet.')
   }
 
   const formValid =
@@ -137,7 +157,10 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
     unlockDateValid &&
     splitUnlockCountValid &&
     safetyChecked &&
-    !clmmSelected
+    clmmPositionSelected &&
+    clmmSingleLockOnly &&
+    clmmAmountValid &&
+    clmmSubmitAllowed
 
   const canPreview = walletConnected && formValid
   const canCreate = canPreview && programDeployed

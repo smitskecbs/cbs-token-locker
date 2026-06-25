@@ -1,4 +1,5 @@
 import type { LockMode } from '../types/splitLock'
+import { isClmmLockingEnabled } from '../config/featureFlags'
 import {
   formatDateInput,
   formatTimeInput,
@@ -48,7 +49,7 @@ export type FormTokenTypeSelect = 'spl' | 'lp' | 'clmm'
 const TOKEN_TYPE_EXPLANATIONS: Record<FormTokenTypeSelect, string> = {
   spl: 'Lock normal SPL tokens held in your wallet. Common for team supply, reserves, treasury wallets, or airdrop allocations.',
   lp: 'Use this when your liquidity position gives you normal SPL LP tokens. Locking LP tokens shows those tokens cannot be moved until the unlock date.',
-  clmm: 'Some concentrated liquidity pools, such as Raydium CLMM, represent liquidity as an NFT position instead of normal SPL LP tokens. These require a separate NFT lock flow.',
+  clmm: 'Lock a Raydium CLMM position NFT from your connected wallet. Each lock holds exactly one position NFT until the unlock date.',
 }
 
 const TOKEN_TYPE_WARNING =
@@ -68,9 +69,19 @@ export function readFormTokenTypeSelect(form?: HTMLFormElement | null): FormToke
   return 'spl'
 }
 
-/** On-chain token type for create lock — CLMM is UI-only and must never be submitted. */
-export function readCreateLockTokenType(form?: HTMLFormElement | null): 'spl' | 'lp' {
-  return readFormTokenTypeSelect(form) === 'lp' ? 'lp' : 'spl'
+/** On-chain token type for create lock. */
+export function readCreateLockTokenType(form?: HTMLFormElement | null): 'spl' | 'lp' | 'clmm' {
+  const tokenType = readFormTokenTypeSelect(form)
+
+  if (tokenType === 'lp') {
+    return 'lp'
+  }
+
+  if (tokenType === 'clmm') {
+    return 'clmm'
+  }
+
+  return 'spl'
 }
 
 export function readLockMode(form?: HTMLFormElement | null): LockMode {
@@ -95,6 +106,8 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
   const amountInput = document.querySelector<HTMLInputElement>('#amount')
   const amountShortcuts = document.querySelector<HTMLElement>('[data-amount-shortcuts]')
   const pickerHost = document.querySelector<HTMLElement>('#clmmPositionPicker')
+  const splitRadio = document.querySelector<HTMLInputElement>('input[name="lockMode"][value="split"]')
+  const singleRadio = document.querySelector<HTMLInputElement>('input[name="lockMode"][value="single"]')
 
   if (mintLabel) {
     mintLabel.textContent = isClmm ? CLMM_MINT_LABEL : isLp ? LP_MINT_LABEL : SPL_MINT_LABEL
@@ -133,7 +146,7 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
   }
 
   if (clmmNote) {
-    clmmNote.hidden = !isClmm
+    clmmNote.hidden = !isClmm || isClmmLockingEnabled()
   }
 
   if (pickerHost) {
@@ -161,6 +174,19 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
 
   if (amountShortcuts) {
     amountShortcuts.hidden = isClmm
+  }
+
+  if (splitRadio && singleRadio) {
+    if (isClmm) {
+      splitRadio.disabled = true
+
+      if (readLockMode() === 'split') {
+        singleRadio.checked = true
+        syncCreateLockModeUi('single')
+      }
+    } else {
+      splitRadio.disabled = false
+    }
   }
 }
 
@@ -316,12 +342,8 @@ export function renderCreateLockForm(): string {
       </div>
 
       <div class="compact-info-note compact-info-note--clmm" id="clmmComingSoonNote" hidden>
-        <p class="compact-info-note__body compact-info-note__body--emphasis">
-          CLMM Position NFT locking is coming soon.
-        </p>
         <p class="compact-info-note__body">
-          You can scan and select positions below to preview the mint. Locking is not enabled in
-          this release.
+          CLMM locking is detected and prepared, but not enabled yet.
         </p>
       </div>
 
