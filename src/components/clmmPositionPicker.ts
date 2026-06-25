@@ -17,6 +17,8 @@ type PickerViewState =
 let pickerAttached = false
 let scanRequestId = 0
 let selectedMint: string | null = null
+let selectedPosition: ClmmPositionCandidate | null = null
+let lastScanPositions: ClmmPositionCandidate[] = []
 let onFormChange: (() => void) | undefined
 
 function getPickerHost(): HTMLElement | null {
@@ -155,6 +157,7 @@ function renderPicker(state: PickerViewState): void {
 
 function applyClmmPositionSelection(mint: string): void {
   selectedMint = mint
+  selectedPosition = lastScanPositions.find((position) => position.mint === mint) ?? null
 
   const mintInput = getMintInput()
   const amountInput = getAmountInput()
@@ -174,6 +177,11 @@ function applyClmmPositionSelection(mint: string): void {
 
 function clearClmmPositionSelection(): void {
   selectedMint = null
+  selectedPosition = null
+}
+
+export function getSelectedClmmPosition(): ClmmPositionCandidate | null {
+  return selectedPosition
 }
 
 export async function refreshClmmPositionScan(): Promise<void> {
@@ -209,10 +217,13 @@ export async function refreshClmmPositionScan(): Promise<void> {
 
   if (result.positions.length === 0) {
     clearClmmPositionSelection()
+    lastScanPositions = []
     renderPicker({ kind: 'empty' })
     onFormChange?.()
     return
   }
+
+  lastScanPositions = result.positions
 
   const stillSelected =
     selectedMint !== null && result.positions.some((position) => position.mint === selectedMint)

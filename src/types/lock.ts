@@ -1,4 +1,4 @@
-export type TokenType = 'spl' | 'lp' | 'unknown'
+export type TokenType = 'spl' | 'lp' | 'clmm' | 'unknown'
 
 export type LockStatus = 'active' | 'unlock_available' | 'unlocked'
 
@@ -43,6 +43,8 @@ export type CreateLockInput = {
   projectDescription: string
   tokenMint: string
   tokenType: TokenType
+  /** SPL Token or Token-2022 program id. Defaults to legacy SPL for spl/lp locks. */
+  tokenProgram?: string
   amount: string
   lockerWallet: string
   unlockDate: string
