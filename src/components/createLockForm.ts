@@ -37,6 +37,9 @@ const LP_MINT_HINT =
 const LP_AMOUNT_LABEL = 'LP Token Amount'
 const LP_AMOUNT_HINT = 'Enter the LP token amount shown in your wallet, not raw decimals.'
 
+const CLMM_MINT_LABEL = 'Position NFT mint'
+const CLMM_MINT_HINT = 'Select a Raydium CLMM position below. The mint is filled automatically.'
+
 const SPLIT_TOTAL_LABEL = 'Total Amount'
 const SPLIT_TOTAL_HINT = 'Total tokens to split across all locks, not raw decimals.'
 
@@ -88,18 +91,24 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
   const explanationBody = document.querySelector<HTMLElement>('#tokenTypeExplanationBody')
   const classificationNote = document.querySelector<HTMLElement>('#tokenClassificationNote')
   const clmmNote = document.querySelector<HTMLElement>('#clmmComingSoonNote')
+  const mintInput = document.querySelector<HTMLInputElement>('#tokenMint')
+  const amountInput = document.querySelector<HTMLInputElement>('#amount')
+  const amountShortcuts = document.querySelector<HTMLElement>('[data-amount-shortcuts]')
+  const pickerHost = document.querySelector<HTMLElement>('#clmmPositionPicker')
 
   if (mintLabel) {
-    mintLabel.textContent = isLp ? LP_MINT_LABEL : SPL_MINT_LABEL
+    mintLabel.textContent = isClmm ? CLMM_MINT_LABEL : isLp ? LP_MINT_LABEL : SPL_MINT_LABEL
   }
 
   if (mintHint) {
-    mintHint.textContent = isLp ? LP_MINT_HINT : SPL_MINT_HINT
+    mintHint.textContent = isClmm ? CLMM_MINT_HINT : isLp ? LP_MINT_HINT : SPL_MINT_HINT
   }
 
   if (amountLabel) {
     if (isSplit) {
       amountLabel.textContent = SPLIT_TOTAL_LABEL
+    } else if (isClmm) {
+      amountLabel.textContent = 'Position amount'
     } else {
       amountLabel.textContent = isLp ? LP_AMOUNT_LABEL : SPL_AMOUNT_LABEL
     }
@@ -108,9 +117,11 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
   if (amountHint) {
     amountHint.textContent = isSplit
       ? SPLIT_TOTAL_HINT
-      : isLp
-        ? LP_AMOUNT_HINT
-        : SPL_AMOUNT_HINT
+      : isClmm
+        ? 'CLMM position NFTs always lock exactly 1 token.'
+        : isLp
+          ? LP_AMOUNT_HINT
+          : SPL_AMOUNT_HINT
   }
 
   if (explanationBody) {
@@ -123,6 +134,33 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
 
   if (clmmNote) {
     clmmNote.hidden = !isClmm
+  }
+
+  if (pickerHost) {
+    pickerHost.hidden = !isClmm
+  }
+
+  if (mintInput) {
+    if (isClmm) {
+      mintInput.readOnly = true
+      mintInput.placeholder = 'Select a position below'
+    } else {
+      mintInput.readOnly = false
+      mintInput.placeholder = 'Mint address'
+    }
+  }
+
+  if (amountInput) {
+    if (isClmm) {
+      amountInput.readOnly = true
+      amountInput.value = '1'
+    } else {
+      amountInput.readOnly = false
+    }
+  }
+
+  if (amountShortcuts) {
+    amountShortcuts.hidden = isClmm
   }
 }
 
@@ -282,10 +320,12 @@ export function renderCreateLockForm(): string {
           CLMM Position NFT locking is coming soon.
         </p>
         <p class="compact-info-note__body">
-          This option is not available yet. Use LP Token (standard AMM) if your position appears as
-          normal SPL LP tokens in your wallet.
+          You can scan and select positions below to preview the mint. Locking is not enabled in
+          this release.
         </p>
       </div>
+
+      <div id="clmmPositionPicker" class="clmm-position-picker" hidden aria-live="polite"></div>
 
       <div class="compact-info-note compact-info-note--split" id="splitLockWarning" hidden>
         <p class="compact-info-note__warning">

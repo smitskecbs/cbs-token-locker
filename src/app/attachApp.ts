@@ -62,6 +62,7 @@ import {
 } from '../wallet'
 import { renderClusterAdvancedDetails, renderWalletNetworkSection } from '../components/clusterPanel'
 import { renderDebugPanel } from '../components/debugPanel'
+import { attachClmmPositionPicker, syncClmmPositionPickerVisibility } from '../components/clmmPositionPicker'
 import { attachCreateLockModeUi, attachCreateLockTokenTypeUi, readCreateLockTokenType, readLockMode } from '../components/createLockForm'
 import { renderLockPreviewModal } from '../components/lockPreviewModal'
 import { renderSplitLockPreviewModal } from '../components/splitLockPreviewModal'
@@ -1150,6 +1151,7 @@ function openLockPreviewModal(preview: PreviewLock): void {
 function attachCreateLockHandlers(): void {
   attachCreateLockTokenTypeUi(() => {
     clearCreateLockError()
+    syncClmmPositionPickerVisibility()
     refreshCreateLockAvailability()
   })
   attachCreateLockModeUi(() => {
@@ -1159,6 +1161,12 @@ function attachCreateLockHandlers(): void {
   attachCreateLockAmountShortcuts(() => {
     clearCreateLockError()
     refreshCreateLockAvailability()
+  })
+  attachClmmPositionPicker({
+    onFormChange: () => {
+      clearCreateLockError()
+      refreshCreateLockAvailability()
+    },
   })
 
   const form = document.querySelector<HTMLFormElement>('#createLockForm')
