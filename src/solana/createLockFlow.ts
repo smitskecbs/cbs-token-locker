@@ -293,7 +293,7 @@ export async function runCreateLockFlow(input: {
 
     const mint = address(input.createInput.tokenMint.trim())
     const owner = address(input.createInput.lockerWallet)
-    const { rawAmount } = await validateOwnerTokenBalance({
+    const { rawAmount, tokenProgram } = await validateOwnerTokenBalance({
       ownerAddress: input.createInput.lockerWallet,
       mintAddress: input.createInput.tokenMint.trim(),
       amount: input.createInput.amount,
@@ -309,6 +309,7 @@ export async function runCreateLockFlow(input: {
       lockSeed,
       tokenType: tokenTypeToByte(input.createInput.tokenType),
       projectName: input.createInput.projectName.trim().slice(0, 48),
+      tokenProgram,
     })
 
     debugOutput.lockAccount = plan.lockAccount

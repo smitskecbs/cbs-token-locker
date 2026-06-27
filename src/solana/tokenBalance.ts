@@ -1,9 +1,37 @@
-import { address, assertIsAddress } from '@solana/kit'
+import { address, assertIsAddress, fetchEncodedAccount, type Address } from '@solana/kit'
 import { fetchMaybeMint, fetchMaybeToken, findAssociatedTokenPda } from '@solana-program/token'
 
 import { OnChainLockerError } from './client'
-import { TOKEN_PROGRAM_ID } from './programId'
+import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from './programId'
 import { getSolanaRpc } from './rpc'
+
+export async function resolveTokenProgramForMint(mintAddress: string): Promise<Address> {
+  try {
+    assertIsAddress(mintAddress)
+  } catch {
+    throw new OnChainLockerError('Invalid mint address.')
+  }
+
+  const rpc = getSolanaRpc()
+  const mint = address(mintAddress)
+  const encodedMint = await fetchEncodedAccount(rpc, mint)
+
+  if (!encodedMint.exists) {
+    throw new OnChainLockerError('Invalid mint address or mint account not found on this cluster.')
+  }
+
+  const mintOwner = String(encodedMint.programAddress)
+
+  if (mintOwner === String(TOKEN_PROGRAM_ID)) {
+    return TOKEN_PROGRAM_ID
+  }
+
+  if (mintOwner === String(TOKEN_2022_PROGRAM_ID)) {
+    return TOKEN_2022_PROGRAM_ID
+  }
+
+  throw new OnChainLockerError('Unsupported token program for this mint.')
+}
 
 export type OwnerTokenBalanceFetchResult =
   | {
@@ -62,7 +90,7 @@ export async function validateOwnerTokenBalance(input: {
   ownerAddress: string
   mintAddress: string
   amount: string
-}): Promise<{ rawAmount: bigint; decimals: number }> {
+}): Promise<{ rawAmount: bigint; decimals: number; tokenProgram: Address }> {
   try {
     assertIsAddress(input.ownerAddress)
     assertIsAddress(input.mintAddress)
@@ -73,6 +101,7 @@ export async function validateOwnerTokenBalance(input: {
   const rpc = getSolanaRpc()
   const owner = address(input.ownerAddress)
   const mint = address(input.mintAddress)
+  const tokenProgram = await resolveTokenProgramForMint(input.mintAddress)
   const mintAccount = await fetchMaybeMint(rpc, mint)
 
   if (!mintAccount.exists) {
@@ -91,7 +120,7 @@ export async function validateOwnerTokenBalance(input: {
   const [ownerTokenAccount] = await findAssociatedTokenPda({
     owner,
     mint,
-    tokenProgram: TOKEN_PROGRAM_ID,
+    tokenProgram,
   })
 
   const tokenAccount = await fetchMaybeToken(rpc, ownerTokenAccount)
@@ -109,5 +138,6 @@ export async function validateOwnerTokenBalance(input: {
   return {
     rawAmount,
     decimals: mintAccount.data.decimals,
+    tokenProgram,
   }
 }
