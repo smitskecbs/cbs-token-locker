@@ -86,7 +86,19 @@ export class CreateLockFlowError extends Error {
 }
 
 function tokenTypeToByte(tokenType: CreateLockInput['tokenType']): number {
-  return tokenType === 'lp' ? 1 : 0
+  if (tokenType === 'spl') {
+    return 0
+  }
+
+  if (tokenType === 'lp') {
+    return 1
+  }
+
+  if (tokenType === 'clmm') {
+    return 2
+  }
+
+  throw new OnChainLockerError('Invalid token type.')
 }
 
 function deriveLockSeed(): bigint {

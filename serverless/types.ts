@@ -1,4 +1,4 @@
-export type TokenType = 'spl' | 'lp'
+export type TokenType = 'spl' | 'lp' | 'clmm' | 'unknown'
 
 export type LockRecord = {
   lockAccount: string

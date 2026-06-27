@@ -38,7 +38,7 @@ pub mod cbs_token_locker {
         require!(source.mint == ctx.accounts.mint.key(), LockerError::MintMismatch);
         require!(source.owner == ctx.accounts.owner.key(), LockerError::OwnerMismatch);
         require!(source.amount >= amount, LockerError::InsufficientBalance);
-        require!(token_type <= 1, LockerError::InvalidTokenType);
+        require!(token_type <= 2, LockerError::InvalidTokenType);
 
         let lock = &mut ctx.accounts.lock;
         lock.owner = ctx.accounts.owner.key();
@@ -254,7 +254,7 @@ pub enum LockerError {
     OwnerMismatch,
     #[msg("Insufficient token balance in the source account.")]
     InsufficientBalance,
-    #[msg("Invalid token type. Use 0 for SPL or 1 for LP.")]
+    #[msg("Invalid token type. Use 0 for SPL, 1 for LP, or 2 for CLMM.")]
     InvalidTokenType,
     #[msg("Lock is still active. Early unlock is not allowed.")]
     LockPeriodActive,
