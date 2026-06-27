@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, Transfer};
 
 declare_id!("DA1sh6XTa13QQ23sLNdcPfCZF5SGMKXXYLxcfAJYcCmU");
 
@@ -55,7 +55,7 @@ pub mod cbs_token_locker {
         lock.token_program = ctx.accounts.token_program.key();
         lock.project_name = pad_project_name(&project_name);
 
-        token::transfer(
+        token_interface::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
                 Transfer {
@@ -101,7 +101,7 @@ pub mod cbs_token_locker {
             &[lock.bump],
         ]];
 
-        token::transfer(
+        token_interface::transfer(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
                 Transfer {
@@ -143,7 +143,10 @@ pub struct CreateLock<'info> {
     )]
     pub lock: Account<'info, TokenLock>,
 
-    pub mint: Account<'info, Mint>,
+    #[account(
+        mint::token_program = token_program,
+    )]
+    pub mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         init,
@@ -152,8 +155,9 @@ pub struct CreateLock<'info> {
         bump,
         token::mint = mint,
         token::authority = lock,
+        token::token_program = token_program,
     )]
-    pub vault: Account<'info, TokenAccount>,
+    pub vault: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -161,9 +165,9 @@ pub struct CreateLock<'info> {
         associated_token::authority = owner,
         associated_token::token_program = token_program,
     )]
-    pub owner_token_account: Account<'info, TokenAccount>,
+    pub owner_token_account: InterfaceAccount<'info, TokenAccount>,
 
-    pub token_program: Program<'info, Token>,
+    pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
@@ -186,7 +190,7 @@ pub struct Unlock<'info> {
         constraint = vault.mint == lock.mint @ LockerError::MintMismatch,
         constraint = vault.amount >= lock.amount @ LockerError::InsufficientVaultBalance,
     )]
-    pub vault: Account<'info, TokenAccount>,
+    pub vault: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -194,9 +198,9 @@ pub struct Unlock<'info> {
         associated_token::authority = owner,
         associated_token::token_program = token_program,
     )]
-    pub owner_token_account: Account<'info, TokenAccount>,
+    pub owner_token_account: InterfaceAccount<'info, TokenAccount>,
 
-    pub token_program: Program<'info, Token>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 #[account]

@@ -20,7 +20,7 @@ default = []
 
 [dependencies]
 anchor-lang = "0.31.1"
-anchor-spl = { version = "0.31.1", features = ["token"] }
+anchor-spl = { version = "0.31.1", features = ["associated_token", "token", "token_2022"] }
 # Force BPF-compatible transitive crates (see root Cargo.toml / DEVNET_TESTING.md).
 blake3 = { workspace = true }
 constant_time_eq = { workspace = true }
