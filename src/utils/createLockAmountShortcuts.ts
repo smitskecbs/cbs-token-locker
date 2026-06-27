@@ -2,10 +2,20 @@ import { fetchOwnerTokenBalance } from '../solana/tokenBalance'
 import { isValidSolanaAddress } from '../locker'
 import { getWalletConnectionState, subscribeToWalletConnection } from '../wallet'
 import {
+  readFormTokenTypeSelect,
+  syncCreateLockTokenTypeUi,
+} from '../components/createLockForm'
+import {
   applyBalancePercentage,
   formatAvailableBalance,
   rawBalanceToInputAmount,
 } from '../utils/amountShortcuts'
+import {
+  clearSplNftLockDetected,
+  isLegacySplNftHolding,
+  isSplNftLockDetected,
+  setSplNftLockDetected,
+} from '../utils/splNftLock'
 
 let amountShortcutsAttached = false
 let balanceCacheKey: string | null = null
@@ -59,6 +69,40 @@ function setAvailableBalance(text: string | null): void {
 
   available.textContent = `Available: ${text}`
   available.hidden = false
+}
+
+function getCreateLockForm(): HTMLFormElement | null {
+  return document.querySelector<HTMLFormElement>('#createLockForm')
+}
+
+function clearSplNftDetectionUi(onAmountChange?: () => void): void {
+  clearSplNftLockDetected()
+  syncCreateLockTokenTypeUi(readFormTokenTypeSelect(getCreateLockForm()))
+  onAmountChange?.()
+}
+
+function applySplNftDetection(
+  decimals: number,
+  rawAmount: bigint,
+  onAmountChange?: () => void,
+): void {
+  const form = getCreateLockForm()
+  const isSpl = readFormTokenTypeSelect(form) === 'spl'
+  const detected = isSpl && isLegacySplNftHolding(decimals, rawAmount)
+
+  setSplNftLockDetected(detected)
+  syncCreateLockTokenTypeUi(readFormTokenTypeSelect(form))
+
+  if (detected) {
+    const amountInput = getAmountInput()
+
+    if (amountInput) {
+      amountInput.value = '1'
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  }
+
+  onAmountChange?.()
 }
 
 function clearBalanceCache(): void {
@@ -129,17 +173,19 @@ async function loadBalance(force = false): Promise<
   return result
 }
 
-async function refreshAvailableBalanceDisplay(): Promise<void> {
+async function refreshAvailableBalanceDisplay(onAmountChange?: () => void): Promise<void> {
   const fetchId = ++balanceFetchId
   const { walletAddress, mintAddress } = readShortcutContext()
 
   if (!mintAddress || !walletAddress) {
+    clearSplNftDetectionUi(onAmountChange)
     setAvailableBalance(null)
     setFeedback('')
     return
   }
 
   if (!isValidSolanaAddress(mintAddress)) {
+    clearSplNftDetectionUi(onAmountChange)
     setAvailableBalance(null)
     setFeedback('')
     return
@@ -152,19 +198,26 @@ async function refreshAvailableBalanceDisplay(): Promise<void> {
   }
 
   if (result.kind === 'wallet_required' || result.kind === 'mint_required' || result.kind === 'invalid_mint') {
+    clearSplNftDetectionUi(onAmountChange)
     setAvailableBalance(null)
     return
   }
 
   if (result.kind === 'mint_not_found' || result.kind === 'load_failed') {
+    clearSplNftDetectionUi(onAmountChange)
     setAvailableBalance(null)
     return
   }
 
   setAvailableBalance(formatAvailableBalance(result.rawAmount, result.decimals))
+  applySplNftDetection(result.decimals, result.rawAmount, onAmountChange)
 }
 
 async function applyAmountShortcut(percent: number, onAmountChange?: () => void): Promise<void> {
+  if (isSplNftLockDetected()) {
+    return
+  }
+
   const { walletAddress, mintAddress } = readShortcutContext()
 
   if (!mintAddress) {
@@ -240,6 +293,7 @@ export function attachCreateLockAmountShortcuts(onAmountChange?: () => void): vo
 
   mintInput?.addEventListener('input', () => {
     clearBalanceCache()
+    clearSplNftDetectionUi(onAmountChange)
     setFeedback('')
 
     if (mintDebounce) {
@@ -247,13 +301,13 @@ export function attachCreateLockAmountShortcuts(onAmountChange?: () => void): vo
     }
 
     mintDebounce = setTimeout(() => {
-      void refreshAvailableBalanceDisplay()
+      void refreshAvailableBalanceDisplay(onAmountChange)
     }, 400)
   })
 
   mintInput?.addEventListener('change', () => {
     clearBalanceCache()
-    void refreshAvailableBalanceDisplay()
+    void refreshAvailableBalanceDisplay(onAmountChange)
   })
 
   document.querySelector('[data-amount-shortcuts]')?.addEventListener('click', (event) => {
@@ -288,9 +342,10 @@ export function attachCreateLockAmountShortcuts(onAmountChange?: () => void): vo
 
   subscribeToWalletConnection(() => {
     clearBalanceCache()
+    clearSplNftDetectionUi(onAmountChange)
     setFeedback('')
-    void refreshAvailableBalanceDisplay()
+    void refreshAvailableBalanceDisplay(onAmountChange)
   })
 
-  void refreshAvailableBalanceDisplay()
+  void refreshAvailableBalanceDisplay(onAmountChange)
 }

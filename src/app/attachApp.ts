@@ -63,7 +63,13 @@ import {
 import { renderClusterAdvancedDetails, renderWalletNetworkSection } from '../components/clusterPanel'
 import { renderDebugPanel } from '../components/debugPanel'
 import { attachClmmPositionPicker, syncClmmPositionPickerVisibility } from '../components/clmmPositionPicker'
-import { attachCreateLockModeUi, attachCreateLockTokenTypeUi, readCreateLockTokenType, readLockMode } from '../components/createLockForm'
+import {
+  attachCreateLockModeUi,
+  attachCreateLockTokenTypeUi,
+  readCreateLockTokenType,
+  readLockMode,
+} from '../components/createLockForm'
+import { isSplNftLockDetected } from '../utils/splNftLock'
 import { renderLockPreviewModal } from '../components/lockPreviewModal'
 import { renderSplitLockPreviewModal } from '../components/splitLockPreviewModal'
 import { attachCreateLockAmountShortcuts } from '../utils/createLockAmountShortcuts'
@@ -853,12 +859,17 @@ function readSplitLockInput(form: HTMLFormElement): SplitLockInput {
 function readCreateLockInput(form: HTMLFormElement): CreateLockInput {
   const walletState = getWalletConnectionState()
   const formData = new FormData(form)
+  const tokenType = readCreateLockTokenType(form)
+  const amount =
+    tokenType === 'spl' && isSplNftLockDetected()
+      ? '1'
+      : String(formData.get('amount') ?? '')
 
   return {
     projectName: String(formData.get('projectName') ?? ''),
     tokenMint: String(formData.get('tokenMint') ?? ''),
-    tokenType: readCreateLockTokenType(form),
-    amount: String(formData.get('amount') ?? ''),
+    tokenType,
+    amount,
     unlockDate: String(formData.get('unlockDate') ?? ''),
     unlockTime: String(formData.get('unlockTime') ?? ''),
     projectDescription: String(formData.get('projectDescription') ?? ''),
