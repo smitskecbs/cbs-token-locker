@@ -7,7 +7,7 @@ import {
   sortLocksNewestFirst,
 } from '../locker'
 import { getPublicLocksPath, navigate } from '../routes'
-import { fetchWalletLocksFromApi, searchLocksFromApi } from '../services/lockApi'
+import { clearLockApiCache, fetchWalletLocksFromApi, searchLocksFromApi } from '../services/lockApi'
 import {
   getSelectedClusterLabel,
   getSelectedNetwork,
@@ -26,6 +26,7 @@ import {
   shouldPauseBackgroundRpcRefresh,
 } from '../state/rpcActivityStore'
 import {
+  getRpcActiveTab,
   setRpcActiveTab,
   subscribeToRpcCallTracker,
   withRpcCallSource,
@@ -44,7 +45,7 @@ import { copyTextToClipboard } from '../utils/copyText'
 import { getProgramStatus, refreshProgramStatus, subscribeToProgramStatus } from '../state/programStore'
 import type { CreateLockInput, LockRecord, LockSearchField, PreviewLock } from '../types/lock'
 import { readCreateLockFormState } from '../utils/formValidation'
-import { formatUserFacingLockError } from '../utils/lockUiErrors'
+import { formatUserFacingLockError, isRpcBusyError } from '../utils/lockUiErrors'
 import { registerHomeTabActivator } from '../utils/lockDetailNavigation'
 import { getSearchTooShortMessage, shouldRunLockSearch } from '../utils/searchQuery'
 import { showSuccessToast } from '../utils/toast'
@@ -63,7 +64,13 @@ import {
 import { renderClusterAdvancedDetails, renderWalletNetworkSection } from '../components/clusterPanel'
 import { renderDebugPanel } from '../components/debugPanel'
 import { attachClmmPositionPicker, syncClmmPositionPickerVisibility } from '../components/clmmPositionPicker'
-import { attachCreateLockModeUi, attachCreateLockTokenTypeUi, readCreateLockTokenType, readLockMode } from '../components/createLockForm'
+import {
+  attachCreateLockModeUi,
+  attachCreateLockTokenTypeUi,
+  readCreateLockTokenType,
+  readLockMode,
+} from '../components/createLockForm'
+import { isSplNftLockDetected } from '../utils/splNftLock'
 import { renderLockPreviewModal } from '../components/lockPreviewModal'
 import { renderSplitLockPreviewModal } from '../components/splitLockPreviewModal'
 import { attachCreateLockAmountShortcuts } from '../utils/createLockAmountShortcuts'
@@ -103,18 +110,73 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 let appLiveRefreshTimer: ReturnType<typeof setInterval> | null = null
 let lastKnownWalletAddress: string | null = null
 let myLocksHandlersAttached = false
+let walletLocksFetchPromise: Promise<LockRecord[]> | null = null
+let walletLocksFetchPromiseKey: string | null = null
+
+const RPC_RATE_LIMIT_USER_MESSAGE = 'RPC rate limited, wait a moment.'
 
 function getWalletCacheKey(address: string): string {
   return `${getSelectedNetwork()}:${address}`
 }
 
+function getActiveAppTab(): AppTabId {
+  const tab = getRpcActiveTab()
+
+  if (tab === 'create' || tab === 'locks' || tab === 'history' || tab === 'search') {
+    return tab
+  }
+
+  return 'create'
+}
+
+function shouldFetchWalletLocksForActiveTab(): boolean {
+  const tab = getActiveAppTab()
+  return tab === 'locks' || tab === 'history'
+}
+
+function isSearchTabOrRouteActive(): boolean {
+  if (getActiveAppTab() === 'search') {
+    return true
+  }
+
+  return window.location.pathname.startsWith('/locks')
+}
+
+function shouldRunMyLocksFetch(options?: { force?: boolean; source?: string }): boolean {
+  const tab = getActiveAppTab()
+  const source = options?.source ?? ''
+
+  if (source === 'my-locks:manual-refresh' || source === 'my-locks:unlock-success') {
+    return true
+  }
+
+  if (source === 'my-locks:tab-activate' || (!options?.force && source === 'my-locks:load')) {
+    return tab === 'locks'
+  }
+
+  if (options?.force) {
+    if (source === 'my-locks:network-change' || source === 'my-locks:wallet-change') {
+      return tab === 'locks' || tab === 'history'
+    }
+
+    if (source === 'my-locks:create-success' || source === 'my-locks:split-create-success') {
+      return tab === 'locks'
+    }
+  }
+
+  return tab === 'locks'
+}
+
 function clearWalletLockCaches(): void {
   myLocksCache = []
   walletLocksCacheKey = null
+  walletLocksFetchPromise = null
+  walletLocksFetchPromiseKey = null
   historyLoaded = false
   historyCacheKey = null
   historyLocksCache = []
   historyVisibleCount = HISTORY_PAGE_SIZE
+  clearLockApiCache()
 }
 
 function clearSearchCache(): void {
@@ -214,7 +276,6 @@ async function handleMyLockUnlock(lockAccount: string, button: HTMLButtonElement
     }
 
     showSuccessToast('Tokens unlocked successfully. Tokens have been returned to your wallet.')
-    await refreshMyLocksSection({ force: true, source: 'my-locks:unlock-success' })
   } catch (error) {
     console.error('[CBS Locker] my locks unlock failure', error)
     button.disabled = false
@@ -366,7 +427,13 @@ let tabHandlersAttached = false
 
 function handleTabActivated(tab: AppTabId): void {
   if (tab === 'locks') {
-    refreshMyLocksDisplay()
+    const walletState = getWalletConnectionState()
+
+    if (walletState.status === 'connected' && walletState.address) {
+      void refreshMyLocksSection({ source: 'my-locks:tab-activate' })
+    } else {
+      refreshMyLocksDisplay()
+    }
   }
 
   if (tab === 'history') {
@@ -429,7 +496,7 @@ function attachTabHandlers(): void {
 
   if (window.location.hash === '#my-locks') {
     setActiveAppTab('locks')
-    refreshMyLocksDisplay()
+    handleTabActivated('locks')
   }
 }
 
@@ -510,16 +577,38 @@ async function ensureWalletLocksCache(
     return myLocksCache
   }
 
-  myLocksCache = await withRpcCallSource(source, () => fetchWalletLocksFromApi(walletAddress))
-  await enrichLocksWithMintDecimals(myLocksCache)
-  walletLocksCacheKey = cacheKey
-  return myLocksCache
+  if (walletLocksFetchPromiseKey === cacheKey && walletLocksFetchPromise) {
+    return walletLocksFetchPromise
+  }
+
+  walletLocksFetchPromiseKey = cacheKey
+  walletLocksFetchPromise = (async () => {
+    try {
+      myLocksCache = await withRpcCallSource(source, () =>
+        fetchWalletLocksFromApi(walletAddress, { bypassCache: force }),
+      )
+      await enrichLocksWithMintDecimals(myLocksCache)
+      walletLocksCacheKey = cacheKey
+      return myLocksCache
+    } finally {
+      if (walletLocksFetchPromiseKey === cacheKey) {
+        walletLocksFetchPromise = null
+        walletLocksFetchPromiseKey = null
+      }
+    }
+  })()
+
+  return walletLocksFetchPromise
 }
 
 async function refreshMyLocksSection(options?: {
   force?: boolean
   source?: string
 }): Promise<void> {
+  if (!shouldRunMyLocksFetch(options)) {
+    return
+  }
+
   if (!options?.force && shouldPauseBackgroundRpcRefresh()) {
     return
   }
@@ -565,14 +654,42 @@ async function refreshMyLocksSection(options?: {
     }
   } catch (error) {
     setLastError(formatLockerError(error, getSelectedClusterLabel()))
-    walletLocksCacheKey = null
-    myLocksCache = []
+    const rateLimited = isRpcBusyError(error)
+
+    if (!rateLimited) {
+      walletLocksCacheKey = null
+      myLocksCache = []
+    }
 
     const { message, details } = formatUserFacingLockError(error, getSelectedClusterLabel())
+    const displayMessage = rateLimited ? RPC_RATE_LIMIT_USER_MESSAGE : message
     const resultsAfterError = getMyLocksResultsHost()
 
     if (resultsAfterError) {
-      renderMyLocksResults(resultsAfterError, [], true, false, walletState.address, message, details)
+      if (rateLimited && myLocksCache.length > 0) {
+        renderMyLocksResults(
+          resultsAfterError,
+          filterActiveWalletLocks(myLocksCache),
+          true,
+          false,
+          walletState.address,
+        )
+        resultsAfterError.insertAdjacentHTML(
+          'afterbegin',
+          `<p class="inline-notice">${RPC_RATE_LIMIT_USER_MESSAGE}</p>`,
+        )
+        return
+      }
+
+      renderMyLocksResults(
+        resultsAfterError,
+        [],
+        true,
+        false,
+        walletState.address,
+        displayMessage,
+        details,
+      )
     }
   }
 }
@@ -622,11 +739,31 @@ async function loadHistory(options?: { force?: boolean }): Promise<void> {
     )
   } catch (error) {
     setLastError(formatLockerError(error, getSelectedClusterLabel()))
+    const rateLimited = isRpcBusyError(error)
     const { message, details } = formatUserFacingLockError(error, getSelectedClusterLabel())
+    const displayMessage = rateLimited ? RPC_RATE_LIMIT_USER_MESSAGE : message
     const host = getHistoryResultsHost()
 
     if (host) {
-      renderHistoryPanelState(host, { kind: 'error', message, details }, walletState.address)
+      if (rateLimited && historyLoaded && historyLocksCache.length > 0) {
+        renderHistoryPanelState(
+          host,
+          {
+            kind: 'ready',
+            locks: historyLocksCache,
+            visibleCount: historyVisibleCount,
+            totalCount: historyLocksCache.length,
+          },
+          walletState.address,
+        )
+        return
+      }
+
+      renderHistoryPanelState(
+        host,
+        { kind: 'error', message: displayMessage, details },
+        walletState.address,
+      )
     }
   }
 }
@@ -655,6 +792,10 @@ function loadMoreHistory(): void {
 
 async function refreshPublicSearchSection(): Promise<void> {
   if (shouldPauseBackgroundRpcRefresh()) {
+    return
+  }
+
+  if (!isSearchTabOrRouteActive()) {
     return
   }
 
@@ -709,17 +850,40 @@ async function refreshPublicSearchSection(): Promise<void> {
     )
   } catch (error) {
     setLastError(formatLockerError(error, getSelectedClusterLabel()))
-    clearSearchCache()
+    const rateLimited = isRpcBusyError(error)
+
+    if (!rateLimited) {
+      clearSearchCache()
+    }
 
     const { message, details } = formatUserFacingLockError(error, getSelectedClusterLabel())
+    const displayMessage = rateLimited ? RPC_RATE_LIMIT_USER_MESSAGE : message
+
+    if (rateLimited && publicLocksCache.length > 0) {
+      resultsHost.innerHTML = renderSearchResults(
+        filterSearchLocks(publicLocksCache, searchIncludeUnlocked),
+        false,
+        { includeUnlocked: searchIncludeUnlocked },
+      )
+      resultsHost.insertAdjacentHTML(
+        'afterbegin',
+        `<p class="inline-notice">${RPC_RATE_LIMIT_USER_MESSAGE}</p>`,
+      )
+      return
+    }
+
     resultsHost.innerHTML = renderSearchResults([], false, {
-      errorMessage: message,
+      errorMessage: displayMessage,
       errorDetails: details,
     })
   }
 }
 
 function schedulePublicSearch(): void {
+  if (!isSearchTabOrRouteActive()) {
+    return
+  }
+
   if (searchDebounceTimer !== null) {
     clearTimeout(searchDebounceTimer)
   }
@@ -747,21 +911,27 @@ function handleNetworkSwitch(network: SolanaNetwork): void {
 
     const walletState = getWalletConnectionState()
 
-    if (walletState.status === 'connected' && walletState.address) {
+    if (
+      walletState.status === 'connected' &&
+      walletState.address &&
+      shouldFetchWalletLocksForActiveTab()
+    ) {
       void refreshMyLocksSection({ force: true, source: 'my-locks:network-change' })
     } else {
       refreshMyLocksDisplay()
     }
 
-    const searchInput = document.querySelector<HTMLInputElement>('#publicLockSearchInput')
-    const searchField = document.querySelector<HTMLSelectElement>('#publicLockSearchField')
-    const query = searchInput?.value ?? ''
-    const field = (searchField?.value ?? 'all') as LockSearchField
+    if (isSearchTabOrRouteActive()) {
+      const searchInput = document.querySelector<HTMLInputElement>('#publicLockSearchInput')
+      const searchField = document.querySelector<HTMLSelectElement>('#publicLockSearchField')
+      const query = searchInput?.value ?? ''
+      const field = (searchField?.value ?? 'all') as LockSearchField
 
-    if (query.trim() && shouldRunLockSearch(query, field)) {
-      void refreshPublicSearchSection()
-    } else {
-      refreshPublicLocksDisplay()
+      if (query.trim() && shouldRunLockSearch(query, field)) {
+        void refreshPublicSearchSection()
+      } else {
+        refreshPublicLocksDisplay()
+      }
     }
   })
 }
@@ -853,12 +1023,17 @@ function readSplitLockInput(form: HTMLFormElement): SplitLockInput {
 function readCreateLockInput(form: HTMLFormElement): CreateLockInput {
   const walletState = getWalletConnectionState()
   const formData = new FormData(form)
+  const tokenType = readCreateLockTokenType(form)
+  const amount =
+    tokenType === 'spl' && isSplNftLockDetected()
+      ? '1'
+      : String(formData.get('amount') ?? '')
 
   return {
     projectName: String(formData.get('projectName') ?? ''),
     tokenMint: String(formData.get('tokenMint') ?? ''),
-    tokenType: readCreateLockTokenType(form),
-    amount: String(formData.get('amount') ?? ''),
+    tokenType,
+    amount,
     unlockDate: String(formData.get('unlockDate') ?? ''),
     unlockTime: String(formData.get('unlockTime') ?? ''),
     projectDescription: String(formData.get('projectDescription') ?? ''),
@@ -1044,7 +1219,12 @@ async function handleSplitLockConfirm(): Promise<void> {
       )
     }
 
-    await refreshMyLocksSection({ force: true, source: 'my-locks:split-create-success' })
+    walletLocksCacheKey = null
+    clearLockApiCache()
+
+    if (getActiveAppTab() === 'locks') {
+      await refreshMyLocksSection({ force: true, source: 'my-locks:split-create-success' })
+    }
   } catch (error) {
     const diagnostics = extractDiagnostics(error)
     const message =
@@ -1130,7 +1310,12 @@ function openLockPreviewModal(preview: PreviewLock): void {
       clearSimulationDiagnostics()
       refreshDebugPanel()
       showCreateLockSuccess()
-      await refreshMyLocksSection({ force: true, source: 'my-locks:create-success' })
+      walletLocksCacheKey = null
+      clearLockApiCache()
+
+      if (getActiveAppTab() === 'locks') {
+        await refreshMyLocksSection({ force: true, source: 'my-locks:create-success' })
+      }
     } catch (error) {
       const diagnostics = extractDiagnostics(error)
       const message =
@@ -1397,7 +1582,7 @@ export function attachAppHandlers(): void {
       clearWalletLockCaches()
       lastKnownWalletAddress = nextAddress
 
-      if (nextWalletState.status === 'connected' && nextAddress) {
+      if (nextWalletState.status === 'connected' && nextAddress && shouldFetchWalletLocksForActiveTab()) {
         void refreshMyLocksSection({ force: true, source: 'my-locks:wallet-change' })
       } else {
         refreshMyLocksDisplay()

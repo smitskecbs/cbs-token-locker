@@ -2,6 +2,7 @@ import { isClmmLockingEnabled } from '../config/featureFlags'
 import { isValidSolanaAddress } from '../locker'
 import { readLockMode, readFormTokenTypeSelect } from '../components/createLockForm'
 import { getSelectedClmmPosition } from '../components/clmmPositionPicker'
+import { isSplNftLockDetected } from './splNftLock'
 import { getSelectedNetwork } from '../solana/cluster'
 import { getProgramStatus } from '../state/programStore'
 import type { LockMode } from '../types/splitLock'
@@ -37,6 +38,7 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
   const lockMode = readLockMode(form)
   const tokenTypeSelect = readFormTokenTypeSelect(form)
   const clmmSelected = tokenTypeSelect === 'clmm'
+  const splNftSelected = tokenTypeSelect === 'spl' && isSplNftLockDetected()
   const selectedClmmPosition = clmmSelected ? getSelectedClmmPosition() : null
 
   const projectName = String(formData?.get('projectName') ?? '').trim()
@@ -64,6 +66,8 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
   const clmmPositionSelected = !clmmSelected || selectedClmmPosition !== null
   const clmmSingleLockOnly = !clmmSelected || lockMode === 'single'
   const clmmAmountValid = !clmmSelected || numericAmount === 1
+  const splNftSingleLockOnly = !splNftSelected || lockMode === 'single'
+  const splNftAmountValid = !splNftSelected || numericAmount === 1
   const clmmLockingEnabled = isClmmLockingEnabled()
   const clmmSubmitAllowed = !clmmSelected || clmmLockingEnabled
 
@@ -138,6 +142,14 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
     disableReasons.push('CLMM position locks support single-lock mode only.')
   }
 
+  if (splNftSelected && lockMode === 'split') {
+    disableReasons.push('NFT locks support single-lock mode only.')
+  }
+
+  if (splNftSelected && !splNftAmountValid) {
+    disableReasons.push('NFT locks must use amount 1.')
+  }
+
   if (clmmSelected && !selectedClmmPosition) {
     disableReasons.push('Select a CLMM position from your wallet.')
   }
@@ -160,7 +172,9 @@ export function readCreateLockFormState(form: HTMLFormElement | null): CreateLoc
     clmmPositionSelected &&
     clmmSingleLockOnly &&
     clmmAmountValid &&
-    clmmSubmitAllowed
+    clmmSubmitAllowed &&
+    splNftSingleLockOnly &&
+    splNftAmountValid
 
   const canPreview = walletConnected && formValid
   const canCreate = canPreview && programDeployed

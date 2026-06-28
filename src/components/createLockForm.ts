@@ -1,5 +1,6 @@
 import type { LockMode } from '../types/splitLock'
 import { isClmmLockingEnabled } from '../config/featureFlags'
+import { clearSplNftLockDetected, isSplNftLockDetected } from '../utils/splNftLock'
 import {
   formatDateInput,
   formatTimeInput,
@@ -93,6 +94,7 @@ export function readLockMode(form?: HTMLFormElement | null): LockMode {
 export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'): void {
   const isLp = tokenType === 'lp'
   const isClmm = tokenType === 'clmm'
+  const isSplNft = tokenType === 'spl' && isSplNftLockDetected()
   const isSplit = readLockMode() === 'split'
 
   const mintLabel = document.querySelector<HTMLElement>('#tokenMintLabel')
@@ -102,6 +104,7 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
   const explanationBody = document.querySelector<HTMLElement>('#tokenTypeExplanationBody')
   const classificationNote = document.querySelector<HTMLElement>('#tokenClassificationNote')
   const clmmNote = document.querySelector<HTMLElement>('#clmmComingSoonNote')
+  const splNftNote = document.querySelector<HTMLElement>('#splNftDetectedNote')
   const mintInput = document.querySelector<HTMLInputElement>('#tokenMint')
   const amountInput = document.querySelector<HTMLInputElement>('#amount')
   const amountShortcuts = document.querySelector<HTMLElement>('[data-amount-shortcuts]')
@@ -132,9 +135,11 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
       ? SPLIT_TOTAL_HINT
       : isClmm
         ? 'CLMM position NFTs always lock exactly 1 token.'
-        : isLp
-          ? LP_AMOUNT_HINT
-          : SPL_AMOUNT_HINT
+        : isSplNft
+          ? 'This lock will hold exactly 1 NFT.'
+          : isLp
+            ? LP_AMOUNT_HINT
+            : SPL_AMOUNT_HINT
   }
 
   if (explanationBody) {
@@ -147,6 +152,11 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
 
   if (clmmNote) {
     clmmNote.hidden = !isClmm || isClmmLockingEnabled()
+  }
+
+  if (splNftNote) {
+    splNftNote.hidden = !isSplNft
+    splNftNote.style.display = isSplNft ? '' : 'none'
   }
 
   if (pickerHost) {
@@ -164,7 +174,7 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
   }
 
   if (amountInput) {
-    if (isClmm) {
+    if (isClmm || isSplNft) {
       amountInput.readOnly = true
       amountInput.value = '1'
     } else {
@@ -173,11 +183,11 @@ export function syncCreateLockTokenTypeUi(tokenType: FormTokenTypeSelect = 'spl'
   }
 
   if (amountShortcuts) {
-    amountShortcuts.hidden = isClmm
+    amountShortcuts.hidden = isClmm || isSplNft
   }
 
   if (splitRadio && singleRadio) {
-    if (isClmm) {
+    if (isClmm || isSplNft) {
       splitRadio.disabled = true
 
       if (readLockMode() === 'split') {
@@ -224,6 +234,10 @@ export function attachCreateLockTokenTypeUi(onChange?: () => void): void {
   }
 
   const syncFromSelect = () => {
+    if (readFormTokenTypeSelect() !== 'spl') {
+      clearSplNftLockDetected()
+    }
+
     syncCreateLockTokenTypeUi(readFormTokenTypeSelect())
     onChange?.()
   }
@@ -344,6 +358,12 @@ export function renderCreateLockForm(): string {
       <div class="compact-info-note compact-info-note--clmm" id="clmmComingSoonNote" hidden>
         <p class="compact-info-note__body">
           CLMM locking is detected and prepared, but not enabled yet.
+        </p>
+      </div>
+
+      <div class="compact-info-note compact-info-note--spl-nft" id="splNftDetectedNote" hidden>
+        <p class="compact-info-note__body">
+          NFT detected — this lock will hold exactly 1 NFT.
         </p>
       </div>
 

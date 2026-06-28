@@ -285,6 +285,7 @@ async function main(): Promise<void> {
     lockSeed,
     tokenType: 0,
     projectName,
+    tokenProgram: TOKEN_PROGRAM_ID,
   })
 
   logStep('create_lock plan ready', {
