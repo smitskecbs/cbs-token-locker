@@ -8,6 +8,7 @@ import { inspectUnlockedLock } from '../solana/unlockVerification'
 import type { LockRecord } from '../types/lock'
 import { formatDateTime, formatTokenType, formatWalletAddress } from '../utils/format'
 import { escapeHtml } from '../utils/html'
+import { downloadLockCertificate } from '../utils/lockCertificateDownload'
 import {
   canUnlockLock,
   formatLockAmountDisplay,
@@ -166,6 +167,9 @@ function renderLockDetails(
 
         <div class="lock-detail-actions">
           <button type="button" class="primary-btn" id="copyLockLinkBtn">Copy Link</button>
+          <button type="button" class="secondary-btn" id="downloadLockCertificateBtn">
+            Download Certificate
+          </button>
           <a
             class="secondary-btn"
             href="${escapeHtml(orbUrl)}"
@@ -409,6 +413,7 @@ export function attachLockDetailHandlers(
 
   const lock = context.lock
   const copyButton = document.querySelector<HTMLButtonElement>('#copyLockLinkBtn')
+  const downloadButton = document.querySelector<HTMLButtonElement>('#downloadLockCertificateBtn')
 
   if (copyButton && lock) {
     copyButton.addEventListener('click', async () => {
@@ -426,6 +431,13 @@ export function attachLockDetailHandlers(
           copyButton.textContent = 'Copy Lock Link'
         }, 2000)
       }
+    })
+  }
+
+  if (downloadButton && lock) {
+    downloadButton.addEventListener('click', () => {
+      const currentLock = activeLockDetailRecord ?? lock
+      downloadLockCertificate(currentLock, context.mintDecimals, 'html')
     })
   }
 

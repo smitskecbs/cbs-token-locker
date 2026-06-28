@@ -2,7 +2,7 @@ import type { TokenType } from '../types/lock'
 import { escapeHtml } from './html'
 
 export function resolveTokenType(tokenType: TokenType | null | undefined): TokenType {
-  if (tokenType === 'lp' || tokenType === 'spl') {
+  if (tokenType === 'lp' || tokenType === 'spl' || tokenType === 'clmm') {
     return tokenType
   }
 
@@ -20,6 +20,10 @@ export function formatLockTypeLabel(tokenType: TokenType | null | undefined): st
     return 'SPL Token'
   }
 
+  if (resolved === 'clmm') {
+    return 'CLMM Position'
+  }
+
   return 'Token'
 }
 
@@ -32,6 +36,10 @@ export function formatLockTypeCertificateBadge(tokenType: TokenType | null | und
 
   if (resolved === 'spl') {
     return 'SPL Token Lock'
+  }
+
+  if (resolved === 'clmm') {
+    return 'CLMM Position Lock'
   }
 
   return 'Token Lock'
@@ -48,6 +56,10 @@ export function formatTokenTypeBadge(tokenType: TokenType | null | undefined): s
     return 'SPL'
   }
 
+  if (resolved === 'clmm') {
+    return 'CLMM'
+  }
+
   return 'Token'
 }
 
@@ -61,7 +73,9 @@ export function renderTokenTypeBadgeMarkup(
       ? ' token-type-badge--lp'
       : tokenType === 'spl'
         ? ' token-type-badge--spl'
-        : ' token-type-badge--generic'
+        : tokenType === 'clmm'
+          ? ' token-type-badge--clmm'
+          : ' token-type-badge--generic'
 
   return `<span class="${escapeHtml(className)}${modifier}">${escapeHtml(label)}</span>`
 }

@@ -206,6 +206,10 @@ export function getTokenTypeLabel(tokenType: TokenType): string {
     return 'SPL Token'
   }
 
+  if (tokenType === 'clmm') {
+    return 'CLMM Position'
+  }
+
   return 'Token'
 }
 
