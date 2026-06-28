@@ -67,10 +67,12 @@ export async function fetchOwnerTokenBalance(input: {
       return { kind: 'mint_not_found' }
     }
 
+    const tokenProgram = await resolveTokenProgramForMint(input.mintAddress)
+
     const [ownerTokenAccount] = await findAssociatedTokenPda({
       owner,
       mint,
-      tokenProgram: TOKEN_PROGRAM_ID,
+      tokenProgram,
     })
 
     const tokenAccount = await fetchMaybeToken(rpc, ownerTokenAccount)

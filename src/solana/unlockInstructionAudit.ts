@@ -4,7 +4,7 @@ import type { LockRecord } from '../types/lock'
 import { UNLOCK_DISCRIMINATOR } from './discriminators'
 import type { UnlockInstructionPlan } from './instructions'
 import { parseTokenLockAccount } from './layout'
-import { ASSOCIATED_TOKEN_PROGRAM_ID, CBS_LOCKER_PROGRAM_ID, SYSTEM_PROGRAM_ID, TOKEN_PROGRAM_ID } from './programId'
+import { ASSOCIATED_TOKEN_PROGRAM_ID, CBS_LOCKER_PROGRAM_ID, SYSTEM_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from './programId'
 import { findLockAccountAddress, findVaultAddress } from './pda'
 import { getSolanaRpc } from './rpc'
 import { findAssociatedTokenPda } from '@solana-program/token'
@@ -267,9 +267,14 @@ export async function auditUnlockInstructionPlan(input: {
     )
   }
 
-  if (input.lock.tokenProgram !== TOKEN_PROGRAM_ID) {
+  const lockTokenProgram = String(input.lock.tokenProgram)
+  const supportedTokenProgram =
+    lockTokenProgram === String(TOKEN_PROGRAM_ID) ||
+    lockTokenProgram === String(TOKEN_2022_PROGRAM_ID)
+
+  if (!supportedTokenProgram) {
     issues.push(
-      `Lock record token program ${input.lock.tokenProgram} differs from standard SPL Token program. Verify Token-2022 support before unlock.`,
+      `Lock record token program ${input.lock.tokenProgram} is not a supported SPL Token or Token-2022 program.`,
     )
   }
 
