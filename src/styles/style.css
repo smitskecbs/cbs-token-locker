@@ -2437,6 +2437,33 @@ body.modal-open {
   font-size: 15px;
 }
 
+.create-lock-api-verification-block {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.create-lock-api-verification {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.create-lock-api-verification--verified {
+  color: #15803d;
+}
+
+.create-lock-api-verification--warning {
+  color: #92400e;
+}
+
+.create-lock-api-verification-link {
+  align-self: start;
+  width: fit-content;
+  font-size: 14px;
+  padding: 8px 14px;
+}
+
 .empty-state-panel {
   padding: 22px 18px;
   border-radius: 18px;

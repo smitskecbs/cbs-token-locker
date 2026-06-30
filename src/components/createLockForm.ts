@@ -483,6 +483,19 @@ export function renderCreateLockForm(): string {
           <p class="success-panel__body" id="createLockSuccessBody">
             Your tokens are now held in an on-chain vault until the unlock date.
           </p>
+          <div class="create-lock-api-verification-block" id="createLockApiVerificationBlock" hidden>
+            <p class="create-lock-api-verification" id="createLockApiVerification" role="status"></p>
+            <a
+              class="secondary-btn create-lock-api-verification-link"
+              id="createLockApiVerificationLink"
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              hidden
+            >
+              View API Verification
+            </a>
+          </div>
         </div>
         <p class="form-error" id="createLockError" role="alert" hidden></p>
       </div>

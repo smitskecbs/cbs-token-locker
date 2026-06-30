@@ -9,6 +9,10 @@ import {
 import { getPublicLocksPath, navigate } from '../routes'
 import { clearLockApiCache, fetchWalletLocksFromApi, searchLocksFromApi } from '../services/lockApi'
 import {
+  getLockVerifyApiUrl,
+  verifyLockFromPublicApi,
+} from '../services/lockVerifyApi'
+import {
   getSelectedClusterLabel,
   getSelectedNetwork,
   setSelectedNetwork,
@@ -1041,6 +1045,72 @@ function readCreateLockInput(form: HTMLFormElement): CreateLockInput {
   }
 }
 
+function resetCreateLockApiVerification(): void {
+  const block = document.querySelector<HTMLElement>('#createLockApiVerificationBlock')
+  const statusElement = document.querySelector<HTMLElement>('#createLockApiVerification')
+  const linkElement = document.querySelector<HTMLAnchorElement>('#createLockApiVerificationLink')
+
+  if (block) {
+    block.hidden = true
+  }
+
+  if (statusElement) {
+    statusElement.textContent = ''
+    statusElement.className = 'create-lock-api-verification'
+  }
+
+  if (linkElement) {
+    linkElement.hidden = true
+    linkElement.removeAttribute('href')
+  }
+}
+
+function showCreateLockApiVerificationPending(lockAccount: string): void {
+  const block = document.querySelector<HTMLElement>('#createLockApiVerificationBlock')
+  const statusElement = document.querySelector<HTMLElement>('#createLockApiVerification')
+  const linkElement = document.querySelector<HTMLAnchorElement>('#createLockApiVerificationLink')
+
+  if (!block || !statusElement || !linkElement) {
+    return
+  }
+
+  block.hidden = false
+  statusElement.textContent = 'Checking CBS Locker API verification…'
+  statusElement.className = 'create-lock-api-verification'
+  linkElement.href = getLockVerifyApiUrl(lockAccount)
+  linkElement.hidden = false
+}
+
+async function refreshCreateLockApiVerification(lockAccount: string): Promise<void> {
+  showCreateLockApiVerificationPending(lockAccount)
+
+  const statusElement = document.querySelector<HTMLElement>('#createLockApiVerification')
+
+  if (!statusElement) {
+    return
+  }
+
+  try {
+    const result = await verifyLockFromPublicApi(lockAccount)
+
+    if (result.verified) {
+      statusElement.textContent = '✅ Verified by CBS Locker API'
+      statusElement.className = 'create-lock-api-verification create-lock-api-verification--verified'
+      return
+    }
+
+    const reason = result.verification?.reason?.trim()
+    statusElement.textContent = reason
+      ? `⚠️ CBS Locker API could not verify this lock. ${reason}`
+      : '⚠️ CBS Locker API could not verify this lock.'
+    statusElement.className = 'create-lock-api-verification create-lock-api-verification--warning'
+  } catch {
+    statusElement.textContent =
+      '⚠️ Unable to reach CBS Locker API for verification. Try again from View API Verification.'
+    statusElement.className = 'create-lock-api-verification create-lock-api-verification--warning'
+  }
+}
+
 function showCreateLockSuccess(message?: string): void {
   const successElement = document.querySelector<HTMLElement>('#createLockSuccess')
   const errorElement = document.querySelector<HTMLElement>('#createLockError')
@@ -1072,6 +1142,8 @@ function showCreateLockError(message: string, diagnostics: SimulationDiagnostics
   if (successElement) {
     successElement.hidden = true
   }
+
+  resetCreateLockApiVerification()
 
   const errorElement = document.querySelector<HTMLElement>('#createLockError')
 
@@ -1107,6 +1179,8 @@ function clearCreateLockError(): void {
   if (successElement) {
     successElement.hidden = true
   }
+
+  resetCreateLockApiVerification()
 
   if (!errorElement) {
     return
@@ -1217,6 +1291,7 @@ async function handleSplitLockConfirm(): Promise<void> {
       showCreateLockSuccess(
         `${result.completed.length} separate locks were created. Each unlock is independent.`,
       )
+      void refreshCreateLockApiVerification(result.completed[result.completed.length - 1].lockAccount)
     }
 
     walletLocksCacheKey = null
@@ -1310,6 +1385,7 @@ function openLockPreviewModal(preview: PreviewLock): void {
       clearSimulationDiagnostics()
       refreshDebugPanel()
       showCreateLockSuccess()
+      void refreshCreateLockApiVerification(createdLock.lockAccount)
       walletLocksCacheKey = null
       clearLockApiCache()
 
