@@ -1,5 +1,6 @@
 import { getPublicLockPath } from '../locker'
 import { fetchLockFromApi } from '../services/lockApi'
+import { getLockVerifyApiUrl } from '../services/lockVerifyApi'
 import { getSelectedNetwork } from '../solana/cluster'
 import { getOrbAccountUrl } from '../solana/config'
 import { fetchOnChainLock } from '../solana/client'
@@ -114,6 +115,7 @@ function renderLockDetails(
   const status = getDisplayLockStatus(lock, now)
   const amount = formatLockAmountDisplay(lock, mintDecimals)
   const orbUrl = getOrbAccountUrl(lock.lockAccount, getSelectedNetwork())
+  const apiVerifyUrl = getLockVerifyApiUrl(lock.lockAccount)
   const backLabel = getLockDetailBackLabel(returnTarget)
 
   const verificationLabel = lock.onChainVerified
@@ -177,6 +179,14 @@ function renderLockDetails(
             rel="noopener noreferrer"
           >
             View on Orb
+          </a>
+          <a
+            class="secondary-btn"
+            href="${escapeHtml(apiVerifyUrl)}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View API Verification
           </a>
           <a class="secondary-btn" href="/" data-lock-detail-back>
             ${escapeHtml(backLabel)}
